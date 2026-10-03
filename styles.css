@@ -249,7 +249,7 @@ svg .anom { outline: none; stroke: var(--red) !important; stroke-width: 5 !impor
 .info.yo { right: 8px; bottom: 6px; width: 56%; }
 .info .f1 { display: flex; justify-content: space-between; font: 9px var(--pix); }
 .info .car { font-size: 13px; color: #57534e; margin: 2px 0 4px; }
-.hpfila { display: flex; align-items: center; gap: 6px; }
+.hpfila { display: flex; align-items: center; gap: 6px; margin-top: 12px; }
 .hpfila label, .pac label { font: 7px var(--pix); color: #b45309; }
 .hp { position: relative; flex: 1; height: 10px; background: #44403c; border: 2px solid var(--ink); border-radius: 6px; }
 .hp .fill { display: block; height: 100%; border-radius: 3px; transition: width .6s ease-out, background .3s; }
