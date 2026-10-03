@@ -309,7 +309,7 @@ var H = window.H || (window.H = {});
   P.combate = async function (d) {
     var s = S(), car = H.CARACTERES[d.car], mot = H.MOTIVOS[d.motivo], NOM = nombreDueno(d);
     s.energia--; UI.hud();
-    H.audio.sfx_('combate'); H.audio.tema('combate');
+    H.audio.sfx_('combate'); H.audio.jingle('encuentro', d.pide >= 2000000 ? 'jefe' : 'combate', 2600);
     await UI.transicion('combate');
     var n = H.nego(s, d), xpC = 0;
     var p = UI.panel('<div class="batalla"><div class="campo">' +
@@ -388,7 +388,7 @@ var H = window.H || (window.H = {});
     }
     if (xpC) UI.xp(xpC);
     if (fin === 'compra') {
-      H.audio.jingle('victoria', 'pueblo');
+      H.audio.jingle('victoria', 'calma');
       await UI.decir('¡' + NOM + ' acepta! Precio final: ' + H.eur(n.precio) + '.');
       p.cerrar();
       await P.financiar(d, n);
@@ -458,7 +458,6 @@ var H = window.H || (window.H = {});
     var s = S(), sec = H.sector(d.sec), est = '';
     for (var i = 0; i < 3; i++) est += '<span class="estrella' + (i < r.estrellas ? ' on' : '') + '" style="animation-delay:' + (0.3 + i * 0.35) + 's">★</span>';
     var veredicto = r.estrellas === 3 ? 'Compra de manual: buen precio y riesgos cubiertos.' : r.estrellas === 2 ? 'Buen precio, pero algún riesgo se quedó sin cubrir.' : 'Has pagado más de lo que vale. Toca arreglarla a fondo.';
-    H.audio.jingle('victoria', 'pueblo');
     await new Promise(function (res) {
       var p = UI.panel('<div class="celebra compra"><div class="slot-edif"></div><h2>¡ES TUYA!</h2><p class="nombre">' + sec.e + ' ' + esc(d.nombre) + '</p><div class="estrellas">' + est + '</div>' +
         '<div class="desglose"><div><span>Has pagado</span><b>' + H.eur(n.precio) + '</b></div><div><span>Valor estimado por Albert</span><b class="' + (r.valorJusto >= n.precio ? 'verde' : 'rojo') + '">' + H.eur(r.valorJusto) + '</b></div>' +
@@ -470,6 +469,7 @@ var H = window.H || (window.H = {});
       b.onclick = function () { H.audio.sfx_('ok'); p.cerrar(); res(); };
     });
     UI.xp(r.xp);
+    H.audio.tema('pueblo');
     if (tuto('primeraCompra')) await UI.decir(['¡Enhorabuena, socio! Tu empresa ya tiene nuestra bandera.', 'Entra en ella para usar PALANCAS: subir precios, contratar gerente, automatizar…', 'Cada mes la empresa genera caja. Y si sube su valor, sube TU PARTE ⭐ (el 25%).'], { nombre: 'ALBERT 📞' });
     await UI.tras();
   };
@@ -560,6 +560,7 @@ var H = window.H || (window.H = {});
   P.vender = function (c) {
     var s = S(), ofs = H.ofertasVenta(s, c);
     if (s.mes - c.mesCompra < 3) return UI.decir('Nadie compra una empresa que acabas de comprar. Espera al menos 3 meses.').then(function () { return false; });
+    H.audio.tema('vender');
     return new Promise(function (res) {
       var html = '<div class="cab"><h2>🏁 OFERTAS POR ' + esc(c.nombre.toUpperCase()) + '</h2><p>Invertiste ' + H.eur(c.invertido) + '. Vender gasta ⚡1.</p></div><div class="lista">' +
         ofs.map(function (o, i) {
@@ -568,7 +569,7 @@ var H = window.H || (window.H = {});
             '<span class="mini"><span><b>' + x1(o.m) + '</b> EBITDA</span><span>Valor <b>' + H.eur(o.valor) + '</b></span></span>' +
             '<span class="mini"><span>Ganancia <b class="' + (g >= 0 ? 'verde' : 'rojo') + '">' + H.eur(g) + '</b></span><span>⭐ Tu 25% <b class="oro">' + H.eur(Math.max(0, g * 0.25)) + '</b></span></span></span></button>';
         }).join('') + '</div><button class="btn" data-f data-x>NO VENDER</button>';
-      var p = UI.panel(html, { clase: 'p-vender', b: function (api) { api.cerrar(); res(false); } });
+      var p = UI.panel(html, { clase: 'p-vender', b: function (api) { H.audio.tema('calma'); api.cerrar(); res(false); } });
       $$('[data-i]', p.el).forEach(function (b) {
         b.onclick = async function () {
           if (b.disabled) return;
@@ -577,13 +578,13 @@ var H = window.H || (window.H = {});
           p.cerrar();
           var r = H.vender(s, c, o);
           H.world.rebuild();
-          H.audio.jingle('victoria', 'pueblo'); H.audio.sfx_('moneda');
+          H.audio.tema('fama'); H.audio.sfx_('moneda');
           await UI.celebrar('<div class="cel-ico">💰</div><h2>¡VENDIDA!</h2><p>' + esc(c.nombre) + '</p><p>Ganancia del fondo: <b class="' + (r.ganancia >= 0 ? 'verde' : 'rojo') + '">' + H.eur(r.ganancia) + '</b></p><p class="oro grande">⭐ Tu parte: ' + H.eur(r.tuya) + '</p>');
           UI.xp(r.xp);
           res(true);
         };
       });
-      $('[data-x]', p.el).onclick = function () { H.audio.sfx_('atras'); p.cerrar(); res(false); };
+      $('[data-x]', p.el).onclick = function () { H.audio.sfx_('atras'); H.audio.tema('calma'); p.cerrar(); res(false); };
       p.enfocar(p.focos()[0]);
     });
   };
@@ -628,7 +629,7 @@ var H = window.H || (window.H = {});
   P.cerrarMes = async function () {
     var s = S();
     if (s.energia > 0 && !(await UI.si('Aún te quedan ' + s.energia + ' ⚡. ¿Cerrar el mes igualmente?'))) return false;
-    H.audio.tema('calma');
+    H.audio.tema('informe');
     for (var k = 0; k <= 10; k++) { H.world.noche = k * 0.07; await UI.dormir(40); }
     var parteAntes = s.tuParte, cajaAntes = s.caja;
     var rep = H.cerrarMes(s);
@@ -660,7 +661,7 @@ var H = window.H || (window.H = {});
   P.evento = function () {
     var s = S(), e = H.eventoActual(s);
     if (!e || !e.ev) { s.evento = null; return Promise.resolve(); }
-    H.audio.sfx_('combate');
+    H.audio.sfx_('combate'); H.audio.tema('evento');
     return new Promise(function (res) {
       var p = UI.panel('<div class="evento"><div class="ev-ico">' + e.ev.e + '</div><h2>¡IMPREVISTO!</h2>' + (e.c ? '<p class="sub">' + H.sector(e.c.sec).e + ' ' + esc(e.c.nombre) + '</p>' : '') +
         '<p class="ev-txt">' + esc(e.ev.t) + '</p>' + (e.mit ? '<p class="nota">📊 Lo tenías detectado: el golpe será la mitad.</p>' : '') +
@@ -699,7 +700,7 @@ var H = window.H || (window.H = {});
   // ================= ALBERT =================
   P.albert = async function () {
     var s = S(), nom = { nombre: 'ALBERT' };
-    H.audio.tema('calma');
+    H.audio.tema('albert');
     await new Promise(function (res) {
       var p = UI.panel('<div class="albert"><div class="cab"><h2>💼 FONDO ALBERT</h2><p>Planta 12. Vistas a todo Villa Pyme.</p></div><div class="slot"></div>' +
         '<div class="corazon"><small>CONFIANZA DE ALBERT</small><div class="hp"><span class="fill ' + (s.albert >= 60 ? 'verde' : s.albert >= 35 ? 'ambar' : 'rojo') + '" style="width:' + s.albert + '%"></span></div><b>' + s.albert + ' ❤</b></div>' +
@@ -722,7 +723,7 @@ var H = window.H || (window.H = {});
   // ================= DEALDEX =================
   P.dealdex = function () {
     var s = S(), ids = Object.keys(H.CODEX), tengo = ids.filter(function (k) { return s.codex[k]; }).length;
-    H.audio.tema('calma');
+    H.audio.tema('dex');
     return new Promise(function (res) {
       var html = '<div class="cab"><h2>📚 DEALDEX</h2><p>' + tengo + ' / ' + ids.length + ' cartas · las estrellas miden tu dominio</p><div class="xpbar grande"><span style="width:' + Math.round(tengo / ids.length * 100) + '%"></span></div></div><div class="dex">' +
         ids.map(function (k, i) {
@@ -757,45 +758,21 @@ var H = window.H || (window.H = {});
     });
   };
 
-  // Cargar la carpeta de canciones (MIDI o audio). Se quedan solo en este móvil.
-  P.musica = function () {
+  // Activar la música integrada (va cifrada en el juego; se abre una vez con el código).
+  P.activarMusica = function () {
     return new Promise(function (res) {
-      function pintar() {
-        var r = H.audio.resumenPropias(), hay = H.audio.hayPropias();
-        return '<div class="cab"><h2>🎧 TU MÚSICA</h2><p>Elige tus MIDIs (o MP3). Se guardan solo en este móvil y suenan con el chip Game Boy.</p></div>' +
-          '<label class="tarjeta grande-c" data-f>📂 ELEGIR CANCIONES<small>Puedes seleccionar la carpeta entera de golpe</small><input type="file" multiple hidden></label>' +
-          '<div class="slots">' + Object.keys(H.audio.SLOTS).map(function (k) {
-            var l = r[k];
-            return '<div class="slotm"><b>' + H.audio.SLOTS[k] + '</b><small>' + (l.length ? esc(l.slice(0, 4).join(' · ')) + (l.length > 4 ? ' +' + (l.length - 4) : '') + (l.length > 1 && k === 'pueblo' ? ' — rotan cada mes' : '') : '—') + '</small></div>';
-          }).join('') + '</div>' +
-          (hay ? '<button class="tarjeta" data-f data-o="on">Sonar mi música: <b>' + (H.audio.usandoPropias() ? 'SÍ' : 'NO') + '</b></button><button class="tarjeta peligro" data-f data-o="borrar">🗑️ Quitar mis canciones</button>' : '<p class="nota">Sin canciones cargadas el juego va solo con efectos de sonido.</p>') +
-          '<button class="btn" data-f data-x>LISTO</button>';
+      var p = UI.panel('<div class="nombre-in"><h2>🔑 ACTIVAR MÚSICA</h2><p class="sub">Escribe tu código una sola vez. Se queda guardado en este móvil.</p>' +
+        '<input maxlength="16" placeholder="CÓDIGO" autocomplete="off" autocapitalize="characters"><button class="btn grande" data-f>ACTIVAR</button><button class="btn" data-f data-x>AHORA NO</button></div>', { clase: 'p-nombre', alCerrar: res });
+      var inp = $('input', p.el), b = $('.btn.grande', p.el);
+      async function ok() {
+        inp.blur(); b.textContent = '⏳ ABRIENDO…';
+        var bien = await H.audio.desbloquear(inp.value);
+        if (bien) { H.audio.sfx_('bien'); UI.aviso('🎵 ¡Música activada! ' + H.audio.canciones() + ' canciones', 'nueva'); p.cerrar(); }
+        else { H.audio.sfx_('mal'); b.textContent = 'ACTIVAR'; UI.aviso('❌ Código incorrecto'); }
       }
-      var p = UI.panel(pintar(), { clase: 'p-opts', alCerrar: res });
-      function enlazar() {
-        var inp = $('input[type=file]', p.el);
-        inp.onchange = function () {
-          if (!inp.files || !inp.files.length) return;
-          UI.aviso('⏳ Leyendo ' + inp.files.length + ' archivos…');
-          H.audio.cargarArchivos(inp.files, function (asig, n) {
-            var tot = Object.keys(asig).reduce(function (a, k) { return a + asig[k].length; }, 0);
-            UI.aviso(tot ? '🎧 ' + tot + ' canciones listas' : '⚠️ No he podido leer esos archivos', tot ? 'nueva' : '');
-            S().musicaPropia = true; H.guardar(S());
-            H.audio.activarPropias(true);
-            refrescar();
-          });
-        };
-        $$('[data-o]', p.el).forEach(function (b) {
-          b.onclick = function () {
-            if (b.dataset.o === 'on') { H.audio.activarPropias(!H.audio.usandoPropias()); S().musicaPropia = H.audio.usandoPropias(); }
-            else if (b.dataset.o === 'borrar') { H.audio.borrarPropia(function () { H.audio.activarPropias(false); S().musicaPropia = false; H.guardar(S()); refrescar(); }); return; }
-            H.guardar(S()); H.audio.sfx_('ok'); refrescar();
-          };
-        });
-        $('[data-x]', p.el).onclick = function () { H.audio.sfx_('atras'); p.cerrar(); };
-      }
-      function refrescar() { p.el.innerHTML = pintar(); enlazar(); p.enfocar(p.focos()[0]); }
-      enlazar(); p.enfocar(p.focos()[0]);
+      b.onclick = ok; inp.onkeydown = function (e) { if (e.key === 'Enter') ok(); };
+      $('[data-x]', p.el).onclick = function () { H.audio.sfx_('atras'); p.cerrar(); };
+      p.enfocar(b);
     });
   };
 
@@ -804,7 +781,7 @@ var H = window.H || (window.H = {});
     return new Promise(function (res) {
       function pintar() {
         return '<div class="cab"><h2>⚙️ OPCIONES</h2></div><div class="opts">' +
-          '<button class="tarjeta" data-f data-o="tumusica">🎧 Tu música <b>' + (H.audio.hayPropias() ? '✓' : '') + '</b></button>' +
+          (H.audio.activa() ? '<div class="tarjeta">🎵 Música integrada: <b>' + H.audio.canciones() + ' canciones ✓</b></div>' : '<button class="tarjeta" data-f data-o="tumusica">🔑 Activar música</button>') +
           '<button class="tarjeta" data-f data-o="musica">🎵 Música: <b>' + (s.musica ? 'SÍ' : 'NO') + '</b></button>' +
           '<button class="tarjeta" data-f data-o="sfx">🔊 Efectos: <b>' + (s.sfx ? 'SÍ' : 'NO') + '</b></button>' +
           '<button class="tarjeta peligro" data-f data-o="reset">⚠️ Empezar partida nueva</button>' +
@@ -815,7 +792,7 @@ var H = window.H || (window.H = {});
         $$('[data-o]', p.el).forEach(function (b) {
           b.onclick = async function () {
             var o = b.dataset.o;
-            if (o === 'tumusica') { await P.musica(); refrescar(); return; }
+            if (o === 'tumusica') { await P.activarMusica(); refrescar(); return; }
             if (o === 'musica') { s.musica = !s.musica; H.audio.setMusica(s.musica); }
             else if (o === 'sfx') { s.sfx = !s.sfx; H.audio.setSfx(s.sfx); }
             else if (o === 'reset') {
@@ -851,13 +828,13 @@ var H = window.H || (window.H = {});
       var p = UI.panel('<div class="titulo"><div class="estrellas-cielo"></div><div class="logo"><span>HOLDING</span><small>VILLA PYME</small></div>' +
         '<p class="lema">Compra pymes · Arréglalas · Véndelas</p><div class="skyline"></div><div class="slot"></div>' +
         '<div class="botones-t">' + (hayPartida ? '<button class="btn grande" data-f data-t="seguir">▶ CONTINUAR</button><button class="btn" data-f data-t="nueva">NUEVA PARTIDA</button>' : '<button class="btn grande parpadea" data-f data-t="nueva">PULSA A PARA EMPEZAR</button>') +
-        '<button class="btn musica-t" data-f data-t="musica">🎧 ' + (H.audio.hayPropias() ? 'TU MÚSICA ✓' : 'CARGAR TUS CANCIONES') + '</button></div>' +
+        (H.audio.activa() ? '' : '<button class="btn musica-t" data-f data-t="musica">🔑 ACTIVAR MÚSICA</button>') + '</div>' +
         '<p class="cred">Teclado: flechas · Z = A · X = B · M = START · v' + H.VERSION + '</p></div>', { clase: 'p-titulo', cerrable: false, b: function () {} });
       $('.slot', p.el).appendChild(UI.sprite(H.LOOK_JUGADOR, 'down', 5, 'respira'));
       $$('[data-t]', p.el).forEach(function (b) {
         b.onclick = async function () {
           H.audio.sfx_('ok');
-          if (b.dataset.t === 'musica') { await P.musica(); b.textContent = '🎧 ' + (H.audio.hayPropias() ? 'TU MÚSICA ✓' : 'CARGAR TUS CANCIONES'); H.audio.tema('calma'); return; }
+          if (b.dataset.t === 'musica') { await P.activarMusica(); if (H.audio.activa()) { b.remove(); p.enfocar(p.focos()[0]); } H.audio.tema('titulo'); return; }
           if (b.dataset.t === 'nueva' && hayPartida && !(await UI.si('Hay una partida guardada. ¿Empezar otra y borrarla?'))) return;
           p.cerrar(); res(b.dataset.t);
         };
@@ -867,7 +844,7 @@ var H = window.H || (window.H = {});
   };
 
   P.intro = async function () {
-    H.audio.tema('calma');
+    H.audio.tema('intro');
     var p = UI.panel('<div class="intro"><div class="slot"></div></div>', { clase: 'p-intro', cerrable: false, b: function () {} });
     $('.slot', p.el).appendChild(UI.sprite(H.LOOK_ALBERT, 'down', 7, 'respira'));
     var nom = { nombre: 'ALBERT' };
@@ -898,6 +875,16 @@ var H = window.H || (window.H = {});
     });
   }
 
+  // Enlace mágico: …/holding/#musica=CODIGO activa la música una vez y se borra de la barra.
+  async function enlaceMusica() {
+    var m = /[#&]musica=([A-Za-z0-9-]+)/.exec(location.hash);
+    if (!m) return false;
+    var ok = await H.audio.desbloquear(m[1]);
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+    if (ok) { UI.aviso('🎵 ¡Música activada! ' + H.audio.canciones() + ' canciones', 'nueva'); var bt = document.querySelector('[data-t=musica]'); if (bt) bt.remove(); }
+    return ok;
+  }
+
   // ================= ARRANQUE =================
   P.arrancar = async function () {
     try { await Promise.race([Promise.all([document.fonts.load('8px "Press Start 2P"'), document.fonts.load('16px "Pixelify Sans"')]), UI.dormir(2500)]); } catch (e) {}
@@ -914,9 +901,9 @@ var H = window.H || (window.H = {});
       H.world.update(dt); H.world.render(t);
       requestAnimationFrame(bucle);
     })(t0);
-    await new Promise(function (r0) { H.audio.cargarPropias(function () { r0(); }); setTimeout(r0, 3000); });
-    if (H.estado.musicaPropia === false) H.audio.activarPropias(false);
-    H.audio.tema('calma');
+    if (!(await enlaceMusica())) await H.audio.iniciar();
+    window.addEventListener('hashchange', enlaceMusica);
+    H.audio.tema('titulo');
     var r = await P.titulo(!!guardado);
     if (r === 'nueva') { H.borrar(); await P.intro(); }
     else { H.audio.tema('pueblo'); await UI.tras(); UI.aviso('📅 <b>' + esc(H.fecha(H.estado.mes)) + '</b> · ⚡ ' + H.estado.energia); }

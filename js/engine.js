@@ -3,7 +3,7 @@ var H = window.H || (window.H = {});
 (function () {
   'use strict';
   var SAVE_KEY = 'holding_v1';
-  H.VERSION = '1.0.0';
+  H.VERSION = '1.1.0';
 
   var U = H.u = {
     rnd: function (a, b) { return a + Math.random() * (b - a); },
