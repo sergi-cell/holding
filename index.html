@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>HOLDING · Villa Pyme</title>
+<meta name="description" content="Compra pymes, destapa sus banderas rojas, negocia con sus dueños y hazlas valer más.">
+<meta name="theme-color" content="#2a1f6b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="HOLDING">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<div id="app">
+  <div id="screen">
+    <canvas id="mundo"></canvas>
+    <div id="hud"></div>
+    <div id="mision" hidden></div>
+    <div id="capa"></div>
+    <div id="dialogo" class="caja dialogo" hidden></div>
+    <div id="menu" class="caja menu" hidden></div>
+    <div id="avisos"></div>
+    <div id="trans" class="trans" hidden></div>
+  </div>
+  <div id="mando">
+    <div class="marca">VILLA PYME <b>COLOR</b></div>
+    <div id="cruceta" aria-label="Cruceta"><i class="u">▲</i><i class="d">▼</i><i class="l">◀</i><i class="r">▶</i><span class="c"></span></div>
+    <div class="ab">
+      <button id="btnB" class="boton" aria-label="B">B</button>
+      <button id="btnA" class="boton" aria-label="A">A</button>
+      <small class="lb">CORRER</small><small class="la">HABLAR</small>
+    </div>
+    <div class="peq-btns">
+      <div><button id="btnSelect" class="peq" aria-label="Select"></button><small>SELECT</small></div>
+      <div><button id="btnStart" class="peq" aria-label="Start"></button><small>START</small></div>
+    </div>
+  </div>
+</div>
+<script src="js/data.js?v=1"></script>
+<script src="js/engine.js?v=1"></script>
+<script src="js/music.js?v=1"></script>
+<script src="js/sprites.js?v=1"></script>
+<script src="js/world.js?v=1"></script>
+<script src="js/ui.js?v=1"></script>
+<script src="js/pantallas.js?v=1"></script>
+<script>
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(function () {});
+</script>
+</body>
+</html>
