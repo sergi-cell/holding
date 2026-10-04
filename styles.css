@@ -414,3 +414,33 @@ svg .anom { outline: none; stroke: var(--red) !important; stroke-width: 5 !impor
 #screen:has(.p-batalla) #pista { display: none; }
 #screen:has(.p-insp) #avisos { top: auto; bottom: 120px; }
 .carta-grande .dato { text-align: left; font-size: 15px; background: #ecfeff; border: 2px solid #0e7490; border-radius: 8px; padding: 8px; }
+
+/* ---------- v1.3: modo horizontal (ordenador / grabar para YouTube) estilo Game Boy Advance ---------- */
+@media (orientation: landscape) and (min-width: 820px) {
+  #app { max-width: none; padding: 34px 232px 44px; }
+  #screen { border-radius: 14px; }
+  #mando { position: absolute; inset: 0; height: auto; pointer-events: none; }
+  #mando > * { pointer-events: auto; }
+  #mando .marca { top: 10px; pointer-events: none; }
+  #cruceta { left: 58px; top: 50%; margin-top: -66px; }
+  .ab { right: 30px; top: 50%; margin-top: -60px; }
+  .peq-btns { bottom: 6px; left: 50%; transform: translateX(-50%); }
+  .peq-btns > div { flex-direction: row; gap: 6px; align-items: center; }
+  .peq-btns small { margin: 0; }
+  .panel { padding-left: max(12px, calc(50% - 320px)); padding-right: max(12px, calc(50% - 320px)); }
+  .p-batalla { padding: 0; }
+  .ficha-top { margin-left: 0; margin-right: 0; border-radius: 10px; border: 4px solid var(--ink); }
+  #mision { right: auto; width: min(560px, calc(100% - 12px)); }
+  #pista { left: 50%; right: auto; transform: translateX(-50%); width: min(600px, calc(100% - 16px)); }
+  #pista.fuera { transform: translateX(-50%) translateY(-8px); }
+  #dialogo { left: 50%; right: auto; transform: translateX(-50%); width: min(760px, calc(100% - 12px)); }
+  #menu { right: max(6px, calc(50% - 380px)); max-width: 640px; min-width: 300px; }
+  .campo .info.rival { width: min(56%, 420px); }
+  .campo .info.yo { width: min(54%, 420px); }
+}
+/* H: esconder la consola y dejar solo el juego (para grabar) */
+body.sin-mando #app { padding: 0 !important; max-width: none; }
+body.sin-mando #mando { display: none; }
+body.sin-mando #screen { border: 0; border-radius: 0; box-shadow: none; }
+#cruceta[data-d] { }
+.boton.on, .peq.on { filter: brightness(1.15); }

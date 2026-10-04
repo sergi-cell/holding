@@ -1,6 +1,6 @@
 // Red primero: la versión nueva se ve al momento; la caché solo sirve sin conexión.
-var CACHE = 'holding-v3';
-var BASE = ['./', 'index.html', 'styles.css?v=3', 'manifest.json', 'js/data.js?v=3', 'js/engine.js?v=3', 'js/music.js?v=3', 'js/sprites.js?v=3', 'js/world.js?v=3', 'js/ui.js?v=3', 'js/pantallas.js?v=3', 'icons/icon-192.png', 'icons/icon-512.png', 'musica.pack'];
+var CACHE = 'holding-v4';
+var BASE = ['./', 'index.html', 'styles.css?v=4', 'manifest.json', 'js/data.js?v=4', 'js/engine.js?v=4', 'js/music.js?v=4', 'js/sprites.js?v=4', 'js/world.js?v=4', 'js/ui.js?v=4', 'js/pantallas.js?v=4', 'icons/icon-192.png', 'icons/icon-512.png', 'musica.pack'];
 self.addEventListener('install', function (e) { e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(BASE); }).then(function () { return self.skipWaiting(); })); });
 self.addEventListener('activate', function (e) { e.waitUntil(caches.keys().then(function (ks) { return Promise.all(ks.filter(function (k) { return k !== CACHE; }).map(function (k) { return caches.delete(k); })); }).then(function () { return self.clients.claim(); })); });
 self.addEventListener('fetch', function (e) {

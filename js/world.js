@@ -253,7 +253,8 @@ var H = window.H || (window.H = {});
     dpr = Math.min(3, window.devicePixelRatio || 1);
     canvas.width = Math.round(r.width * dpr); canvas.height = Math.round(r.height * dpr);
     canvas.style.width = r.width + 'px'; canvas.style.height = r.height + 'px';
-    S = Math.max(1, Math.round(canvas.width / (TS * 11)));
+    // Móvil vertical: ~11 casillas de ancho. Pantalla ancha: ~9,5 de alto (se ve más mundo a los lados).
+    S = Math.max(1, Math.round(Math.min(canvas.width / (TS * 11), canvas.height / (TS * 9.5))));
     vw = canvas.width / S; vh = canvas.height / S;
   };
   W.colocar = function () {

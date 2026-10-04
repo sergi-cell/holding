@@ -48,16 +48,24 @@ var H = window.H || (window.H = {});
     }
     boton('#btnA', 'a'); boton('#btnB', 'b'); boton('#btnStart', 'start'); boton('#btnSelect', 'start');
     var MAP = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', w: 'up', s: 'down', a: 'left', d: 'right' };
+    // El teclado también "aprieta" los botones de la pantalla: en un vídeo se ve qué pulsas.
+    function marcar(tecla, on) {
+      var b = tecla === 'a' ? $('#btnA') : tecla === 'b' ? $('#btnB') : tecla === 'start' ? $('#btnStart') : null;
+      if (b) b.classList.toggle('on', on);
+    }
     window.addEventListener('keydown', function (e) {
       if (e.target && e.target.tagName === 'INPUT') return;
-      if (MAP[e.key]) { e.preventDefault(); if (!e.repeat) pulsarDir(MAP[e.key]); }
-      else if (e.key === 'z' || e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (!e.repeat) enviar('a'); }
-      else if (e.key === 'x' || e.key === 'Escape' || e.key === 'Backspace') { e.preventDefault(); H.world.correr = true; if (!e.repeat) enviar('b'); }
-      else if (e.key === 'm' || e.key === 'Tab') { e.preventDefault(); if (!e.repeat) enviar('start'); }
+      if (MAP[e.key]) { e.preventDefault(); pad.dataset.d = MAP[e.key]; if (!e.repeat) pulsarDir(MAP[e.key]); }
+      else if (e.key === 'z' || e.key === 'Enter' || e.key === ' ') { e.preventDefault(); marcar('a', true); if (!e.repeat) enviar('a'); }
+      else if (e.key === 'x' || e.key === 'Escape' || e.key === 'Backspace') { e.preventDefault(); marcar('b', true); H.world.correr = true; if (!e.repeat) enviar('b'); }
+      else if (e.key === 'm' || e.key === 'Tab') { e.preventDefault(); marcar('start', true); if (!e.repeat) enviar('start'); }
+      else if (e.key === 'h' || e.key === 'H') { document.body.classList.toggle('sin-mando'); setTimeout(H.world.resize, 30); }
     });
     window.addEventListener('keyup', function (e) {
-      if (MAP[e.key] && H.world.dir === MAP[e.key]) soltarDir();
-      if (e.key === 'x' || e.key === 'Escape' || e.key === 'Backspace') H.world.correr = false;
+      if (MAP[e.key]) { if (pad.dataset.d === MAP[e.key]) pad.dataset.d = ''; if (H.world.dir === MAP[e.key]) soltarDir(); }
+      if (e.key === 'z' || e.key === 'Enter' || e.key === ' ') marcar('a', false);
+      if (e.key === 'x' || e.key === 'Escape' || e.key === 'Backspace') { marcar('b', false); H.world.correr = false; }
+      if (e.key === 'm' || e.key === 'Tab') marcar('start', false);
     });
     document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
   };

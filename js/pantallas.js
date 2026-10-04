@@ -907,7 +907,7 @@ var H = window.H || (window.H = {});
         '<p class="lema">Compra pymes · Arréglalas · Véndelas</p><div class="skyline"></div><div class="slot"></div>' +
         '<div class="botones-t">' + (hayPartida ? '<button class="btn grande" data-f data-t="seguir">▶ CONTINUAR</button><button class="btn" data-f data-t="nueva">NUEVA PARTIDA</button>' : '<button class="btn grande parpadea" data-f data-t="nueva">PULSA A PARA EMPEZAR</button>') +
         (H.audio.activa() ? '' : '<button class="btn musica-t" data-f data-t="musica">🔑 ACTIVAR MÚSICA</button>') + '</div>' +
-        '<p class="cred">Teclado: flechas · Z = A · X = B · M = START · v' + H.VERSION + '</p></div>', { clase: 'p-titulo', cerrable: false, b: function () {} });
+        '<p class="cred">Teclado: flechas · Z = A · X = B · M = START · H = ocultar consola · v' + H.VERSION + '</p></div>', { clase: 'p-titulo', cerrable: false, b: function () {} });
       $('.slot', p.el).appendChild(UI.sprite(H.LOOK_JUGADOR, 'down', 5, 'respira'));
       $$('[data-t]', p.el).forEach(function (b) {
         b.onclick = async function () {
