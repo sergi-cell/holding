@@ -5,6 +5,7 @@
   --shell: #3d2f8f; --shell2: #2a1f6b; --pix: 'Press Start 2P', monospace; --txt: 'Pixelify Sans', 'Trebuchet MS', sans-serif;
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+[hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; background: #0d0b1f; overflow: hidden; overscroll-behavior: none; }
 body { font-family: var(--txt); color: var(--ink); -webkit-user-select: none; user-select: none; touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 button { font: inherit; color: inherit; }
@@ -382,3 +383,34 @@ svg .anom { outline: none; stroke: var(--red) !important; stroke-width: 5 !impor
 
 @media (max-height: 700px) { #mando { height: 150px; } #cruceta { transform: scale(.85); transform-origin: left top; } .ab { top: 4px; transform: rotate(-24deg) scale(.85); } }
 @media (prefers-reduced-motion: reduce) { * { animation-duration: .01s !important; } }
+
+/* ---------- v1.2: pistas, parte negativa, combate con gestos ---------- */
+#pista { position: absolute; z-index: 70; top: 82px; left: 8px; right: 8px; display: flex; gap: 8px; align-items: center; background: #fffbea; border: 3px solid var(--ink); border-radius: 10px; padding: 6px 10px; box-shadow: 0 3px 0 var(--ink); animation: aviso .25s cubic-bezier(.3,1.6,.5,1); }
+#pista p { margin: 0; font-size: 16px; line-height: 1.15; }
+#pista .cara { flex-shrink: 0; background: #fde68a; border: 2px solid var(--ink); border-radius: 50%; width: 38px; height: 38px; display: grid; place-items: center; overflow: hidden; }
+#pista.fuera { opacity: 0; transform: translateY(-8px); transition: all .2s; }
+#hud .parte.neg { color: #fca5a5; }
+#hud .parte i { font-style: normal; font-size: 7px; }
+#hud .parte i.sube { color: #86efac; } #hud .parte i.baja { color: #fca5a5; }
+#hud .parte { position: relative; }
+#hud .flota { top: 22px; right: 0; font-size: 9px; }
+.gesto { position: absolute; z-index: 4; bottom: -40px; left: 50%; transform: translateX(-50%); background: #fff; border: 2px solid var(--ink); border-radius: 10px; padding: 3px 7px; font-size: 13px; white-space: nowrap; animation: aviso .3s; }
+.gesto::after { content: ''; position: absolute; left: 50%; margin-left: -6px; top: -8px; border: 6px solid transparent; border-bottom-color: var(--ink); border-top: 0; }
+.hp.poker .fill { background: repeating-linear-gradient(45deg, #57534e 0 6px, #78716c 6px 12px) !important; width: 100% !important; }
+.hp.poker .umbral { display: none; }
+.hp.poker::after { content: '???'; position: absolute; inset: -2px 0 0; display: grid; place-items: center; font: 7px var(--pix); color: #fff; }
+.rival-flag { position: absolute; z-index: 3; right: 8px; top: 64px; font-size: 26px; background: #fff; border: 2px solid var(--ink); border-radius: 50%; width: 40px; height: 40px; display: grid; place-items: center; animation: late .7s infinite; }
+#menu.cols.rejilla li { flex-direction: column; align-items: center; text-align: center; padding: 6px 2px; font-size: 13px; }
+#menu.cols.rejilla li em { font-size: 24px; margin: 0; }
+#menu.cols.rejilla li .cur { display: none; }
+#menu.cols.rejilla li.sel { background: #fde68a; outline: 2px solid var(--ink); }
+#menu.cols.rejilla li .t { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.parte-linea { text-align: center; font-size: 16px; margin: 6px 0; }
+#trans.fundido { background: #000; animation: fundeIn .2s forwards; }
+#trans.fundido.sale { animation: fundeOut .23s forwards; }
+@keyframes fundeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fundeOut { from { opacity: 1; } to { opacity: 0; } }
+#screen:has(.p-batalla) #avisos { top: 128px; bottom: auto; left: 8px; right: 44%; align-items: flex-start; }
+#screen:has(.p-batalla) #pista { display: none; }
+#screen:has(.p-insp) #avisos { top: auto; bottom: 120px; }
+.carta-grande .dato { text-align: left; font-size: 15px; background: #ecfeff; border: 2px solid #0e7490; border-radius: 8px; padding: 8px; }

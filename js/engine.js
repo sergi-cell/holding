@@ -3,7 +3,7 @@ var H = window.H || (window.H = {});
 (function () {
   'use strict';
   var SAVE_KEY = 'holding_v1';
-  H.VERSION = '1.1.0';
+  H.VERSION = '1.2.0';
 
   var U = H.u = {
     rnd: function (a, b) { return a + Math.random() * (b - a); },
@@ -150,22 +150,41 @@ var H = window.H || (window.H = {});
       if (s.stats.compras > 0 && Math.random() < 0.08 + s.nivel * 0.01) banderas.push('fraude');
     }
     var f = 1; banderas.forEach(function (b) { if (FACTOR[b]) f *= FACTOR[b]; });
-    var motivo = fijo && fijo.motivo ? fijo.motivo : U.pick(Object.keys(H.MOTIVOS));
+    var visibles = Object.keys(H.MOTIVOS).filter(function (k) { return !H.MOTIVOS[k].oculto; });
+    var motivo = fijo && fijo.motivo ? fijo.motivo : U.pick(visibles), dicho = null;
+    // Algunos vendedores no cuentan el motivo real. Lo dicho suena bonito; lo real suele doler.
+    if (!fijo && Math.random() < Math.min(0.4, 0.15 + 0.05 * (s.nivel - 1))) {
+      motivo = U.wpick([['caja', 3], ['amenaza', 2], [U.pick(visibles), 2]]);
+      dicho = U.pick(['jubilacion', 'sucesor', 'liquidez', 'quemado'].filter(function (k) { return k !== motivo; }));
+      if (motivo === 'caja') ['hacienda', 'cobros'].forEach(function (b) { if (banderas.indexOf(b) < 0 && Math.random() < 0.45) banderas.push(b); });
+      if (motivo === 'amenaza' && banderas.indexOf('tendencia') < 0 && Math.random() < 0.5) banderas.push('tendencia');
+      f = 1; banderas.forEach(function (b) { if (FACTOR[b]) f *= FACTOR[b]; });
+    }
     var edad = motivo === 'jubilacion' ? U.ri(63, 71) : U.ri(46, 69);
     var apellido = U.pick(H.APELLIDOS);
     var d = {
       id: 'd' + (s.idSeq++), lote: lote, sec: sec.id, nombre: U.pick(sec.names) + ' ' + apellido,
       ciudad: U.pick(H.CIUDADES), fundada: U.ri(1978, 2010), ventas: ventas, ebitdaDecl: ebitdaDecl, factor: f, pide: pide,
-      empleados: Math.max(6, Math.round(ventas / U.rnd(80000, 120000))),
+      empleados: Math.max(4, Math.round(ventas / ((sec.vxe || 100) * 1000 * U.rnd(0.8, 1.2)))),
       banderas: banderas.map(function (id) { return { id: id, vista: false, jugada: false }; }),
       motivo: motivo, car: fijo && fijo.car ? fijo.car : U.pick(Object.keys(H.CARACTERES)),
       dueno: { nombre: U.pick(H.NOMBRES_DUENO), apellido: apellido, edad: edad, look: genLook(edad) },
       recur: U.clamp(sec.recur + U.rnd(-0.12, 0.12), 0.05, 0.97),
-      motivoSabido: false, analizado: false, meses: 0, nuevo: true
+      motivoSabido: false, analizado: false, meses: 0, nuevo: true,
+      motivoDicho: dicho, verdadSabida: false
     };
+    if (!fijo) {
+      if (Math.random() < Math.min(0.5, 0.25 + 0.05 * (s.nivel - 1))) d.rival = { n: U.pick(RIVALES), turno: U.ri(2, 4), visible: Math.random() < 0.7 };
+      if (Math.random() < 0.4) { var tg = U.ri(2, 5); if (d.rival && tg === d.rival.turno) tg++; d.giro = { id: U.pick(Object.keys(H.GIROS)), turno: tg }; }
+      d.poker = (d.car === 'desconfiado' || s.nivel >= 3) && Math.random() < 0.35;
+    }
     d.tags = genTags(d);
+    if (d.motivoDicho && Math.random() < 0.45) d.tags.splice(1, 0, d.motivo === 'caja' ? '🏦 "Los bancos están raros"' : d.motivo === 'amenaza' ? '🏗️ Obras de un gigante al lado' : '🤐 No le gusta hablar de futuro');
+    if (d.rival && d.rival.visible) d.tags.unshift('🦈 Hay otro comprador');
+    d.tags = d.tags.slice(0, 5);
     return d;
   };
+  var RIVALES = ['Fondo Cantábrico', 'Grupo Levante', 'un competidor local', 'un family office', 'un fondo de búsqueda'];
 
   H.ebitdaReal = function (d) { return d.ebitdaDecl * d.factor; };
   function cubierta(id, est) { var arr = H.BANDERAS[id].arregla; return (est || []).some(function (e) { return arr.indexOf(e) >= 0; }); }
@@ -323,27 +342,69 @@ var H = window.H || (window.H = {});
     vendor_loan: 'Me preocupa pagar un dineral en impuestos de golpe.', earnout: 'Me preocupa que no valores lo que esto puede crecer.',
     rapido: 'Me preocupa que esto se alargue meses.', escrow: 'Me preocupa que luego me vengas con reclamaciones eternas.'
   };
-  H.umbralFirma = function (d, n) { return 52 + (n.precio < d.pide * 0.8 ? 8 : 0) + (n.precio < d.pide * 0.7 ? 8 : 0); };
+  H.umbralFirma = function (d, n) { return 52 + (H.CARACTERES[d.car].umbral || 0) + (d.motivoDicho && !d.verdadSabida ? 8 : 0) + (n.precio < d.pide * 0.8 ? 8 : 0) + (n.precio < d.pide * 0.7 ? 8 : 0); };
+  // Lo que el jugador cree que es su motivo (puede ser mentira).
+  H.motivoMostrado = function (d) { if (!d.motivoSabido) return null; return d.motivoDicho && !d.verdadSabida ? d.motivoDicho : d.motivo; };
+  function sabeReal(d) { return d.motivoSabido && (!d.motivoDicho || d.verdadSabida); }
 
   H.nego = function (s, d) {
     var car = H.CARACTERES[d.car];
-    return { conf: car.confianza + (d.analizado ? 6 : 0), pac: car.paciencia, pacMax: car.paciencia, precio: d.pide, est: [], historia: 0, preocupa: false, ancla: 0, fin: null };
+    return { conf: car.confianza + (d.analizado ? 6 : 0), pac: car.paciencia, pacMax: car.paciencia, precio: d.pide, est: [], historia: 0, preocupa: false, ancla: 0, fin: null, turno: 0, suelo: 0, sospecha: false };
   };
+
+  // Gestos: lo que se ve del vendedor. Con cara de póker es la única pista de su confianza.
+  H.gesto = function (d, n) {
+    var um = H.umbralFirma(d, n);
+    if (d.motivoDicho && !d.verdadSabida && d.motivoSabido && (n.sospecha || n.turno % 3 === 2)) return '👀 evita tu mirada';
+    if (n.pac <= 2) return '⌚ mira el reloj';
+    if (n.conf >= um) return '🙂 se inclina hacia ti';
+    if (n.conf >= um - 15) return '🤔 se lo está pensando';
+    if (n.conf >= 25) return '🙅 brazos cruzados';
+    return '😤 resopla';
+  };
+
+  function nuevoR() { return { lineas: [], dc: 0, dp: 0, tono: 'neutro', aprende: [], fin: null, evento: null }; }
+  function aplicar(d, n, r) {
+    n.conf = U.clamp(n.conf + r.dc, 0, 100);
+    var nuevo = n.precio + r.dp;
+    if (r.dp < 0 && n.suelo) nuevo = Math.max(nuevo, Math.min(n.precio, n.suelo));
+    n.precio = Math.max(Math.round(d.pide * 0.6), Math.round(nuevo));
+  }
 
   H.jugar = function (s, d, n, tipo, arg) {
     var car = H.CARACTERES[d.car], mot = H.MOTIVOS[d.motivo], nom = d.dueno.nombre.toUpperCase();
-    var r = { lineas: [], dc: 0, dp: 0, tono: 'neutro', aprende: [], fin: null };
+    var r = nuevoR();
     function di(t) { r.lineas.push(nom + ': «' + t + '»'); }
     if (tipo === 'motivo') {
       if (d.motivoSabido) { di('¿Otra vez? Ya te lo he dicho.'); r.dc = -3; r.tono = 'mal'; }
-      else { d.motivoSabido = true; s.stats.motivos++; di(mot.frase); r.lineas.push('¡Has descubierto su MOTIVO: ' + mot.n.toUpperCase() + ' ' + mot.e + '!'); r.dc = 10; r.tono = 'bien'; r.aprende.push('motivo', 'preguntar'); }
+      else {
+        var dicho = H.MOTIVOS[d.motivoDicho || d.motivo];
+        d.motivoSabido = true; if (!d.motivoDicho) d.verdadSabida = true; s.stats.motivos++;
+        di(dicho.frase); r.lineas.push('Te cuenta su MOTIVO: ' + dicho.e + ' ' + dicho.n.toUpperCase() + '.');
+        r.dc = 10; r.tono = 'bien'; r.aprende.push('motivo', 'preguntar');
+      }
+    } else if (tipo === 'repreguntar') {
+      if (d.motivoDicho && !d.verdadSabida) {
+        if (n.conf >= 45) {
+          d.verdadSabida = true; s.stats.verdades = (s.stats.verdades || 0) + 1;
+          di('…Vale. Te voy a ser sincero.'); di(mot.frase);
+          r.lineas.push('¡Te había ocultado algo! MOTIVO REAL: ' + mot.e + ' ' + mot.n.toUpperCase() + '.');
+          r.dc = 8; r.tono = 'bien'; r.aprende.push('leer_vendedor');
+          if (mot.oculto) { r.dp = -Math.round(d.pide * (d.motivo === 'caja' ? 0.08 : 0.06)); r.lineas.push('Ahora sabes que necesita cerrar: acepta bajar el precio.'); }
+        } else { di('Que sí, hombre. Ya te lo he dicho.'); r.lineas.push('Aún no se fía lo bastante para sincerarse.'); r.dc = -4; r.tono = 'mal'; }
+      } else { di('Es lo que te he dicho. ¿No me crees?'); r.lineas.push('Era verdad. Desconfiar de quien es sincero también resta.'); r.dc = -5; r.tono = 'mal'; }
     } else if (tipo === 'historia') {
       var g = Math.round(car.escuchar * Math.pow(0.5, n.historia)); n.historia++;
       di(U.pick(HISTORIAS)); r.dc = g; r.tono = g >= 5 ? 'bien' : 'neutro';
       if (g < 4) r.lineas.push('Ya te ha contado bastante. Escuchar más no suma.');
     } else if (tipo === 'preocupa') {
       if (n.preocupa) { di('Ya te lo he dicho, hombre.'); r.dc = -2; r.tono = 'mal'; }
-      else { n.preocupa = true; var q = mot.quiere[0]; di(PREOCUPA[q] || PREOCUPA.rapido); r.lineas.push('Pista: le encajaría ' + H.ESTRUCTURAS[q].e + ' ' + H.ESTRUCTURAS[q].n.toUpperCase() + '.'); r.dc = 5; r.tono = 'bien'; r.aprende.push('legado'); }
+      else {
+        n.preocupa = true; var q = mot.quiere[0]; di(PREOCUPA[q] || PREOCUPA.rapido);
+        r.lineas.push('Pista: le encajaría ' + H.ESTRUCTURAS[q].e + ' ' + H.ESTRUCTURAS[q].n.toUpperCase() + '.');
+        if (d.motivoDicho && !d.verdadSabida && d.motivoSabido && H.MOTIVOS[d.motivoDicho].quiere[0] !== q) { r.lineas.push('Hmm… eso no pega con el motivo que te contó.'); n.sospecha = true; }
+        r.dc = 5; r.tono = 'bien'; r.aprende.push('legado');
+      }
     } else if (tipo === 'bandera') {
       var b = d.banderas.filter(function (x) { return x.id === arg; })[0], B = H.BANDERAS[arg];
       b.jugada = true;
@@ -352,19 +413,23 @@ var H = window.H || (window.H = {});
         var imp = B.impacto * d.pide * (B.arregla.indexOf('precio') >= 0 ? 1 : 0.5);
         if (n.conf >= 35) { r.dp = -Math.round(imp * car.datos); r.dc = car.datos > 1.2 ? 3 : -4; di(U.pick(ACEPTA_DATO)); r.tono = 'bien'; }
         else { r.dp = -Math.round(imp * 0.5); r.dc = -Math.round(12 * car.ofende); di(U.pick(OFENDIDO_DATO)); r.lineas.push('Sin confianza, los datos suenan a ataque.'); r.tono = 'mal'; }
-        if (B.arregla.indexOf('precio') < 0) r.lineas.push('El precio baja, pero el riesgo sigue ahí. Se cubre con: ' + B.arregla.map(function (e) { return H.ESTRUCTURAS[e].e + ' ' + H.ESTRUCTURAS[e].n; }).join(' o ') + '.');
+        if (B.arregla.indexOf('precio') < 0) r.lineas.push('Baja el precio, pero el riesgo sigue. Se cubre con: ' + B.arregla.map(function (e) { return H.ESTRUCTURAS[e].e + ' ' + H.ESTRUCTURAS[e].n; }).join(' o ') + '.');
       }
       r.aprende.push(B.concepto);
     } else if (tipo === 'estructura') {
       var E = H.ESTRUCTURAS[arg]; n.est.push(arg);
       var quiere = mot.quiere.indexOf(arg) >= 0, odia = mot.odia.indexOf(arg) >= 0;
-      r.dc = d.motivoSabido ? (quiere ? 14 : odia ? -14 : 2) : (quiere ? 6 : odia ? -18 : 1);
+      r.dc = sabeReal(d) ? (quiere ? 14 : odia ? -14 : 2) : d.motivoSabido ? (quiere ? 10 : odia ? -16 : 1) : (quiere ? 6 : odia ? -18 : 1);
       if (arg === 'rapido') r.dp = -Math.round(d.pide * 0.05);
       // Darle lo que de verdad quiere vale dinero para él: rebaja el precio.
       if (quiere && arg !== 'rapido') r.dp -= Math.round(d.pide * (d.motivoSabido ? 0.04 : 0.02));
       di(U.pick(quiere ? LE_GUSTA : odia ? NO_LE_GUSTA : NEUTRO));
       if (quiere && arg !== 'rapido') r.lineas.push('Le importa tanto que rebaja el precio.');
       if (odia && !d.motivoSabido) r.lineas.push('Si le hubieras preguntado por qué vende, lo habrías visto venir.');
+      // La pista de la mentira: lo que debería gustarle según lo que te contó… no le gusta.
+      if (d.motivoDicho && !d.verdadSabida && d.motivoSabido && H.MOTIVOS[d.motivoDicho].quiere.indexOf(arg) >= 0 && !quiere) {
+        r.lineas.push('Raro… por lo que te contó, debería encantarle. ¿Te ha dicho toda la verdad?'); n.sospecha = true;
+      }
       d.banderas.forEach(function (b) { if (b.vista && H.BANDERAS[b.id].arregla.indexOf(arg) >= 0) r.lineas.push('Riesgo cubierto: ' + H.BANDERAS[b.id].e + ' ' + H.BANDERAS[b.id].n + ' ✓'); });
       r.tono = r.dc > 3 ? 'bien' : r.dc < 0 ? 'mal' : 'neutro';
       r.aprende.push(E.concepto);
@@ -376,17 +441,62 @@ var H = window.H || (window.H = {});
     } else if (tipo === 'cerrar') {
       var umbral = H.umbralFirma(d, n);
       if (n.conf >= umbral) { di('Trato hecho. Choca esa mano.'); r.fin = 'compra'; r.tono = 'bien'; }
-      else { di(U.pick(NO_CIERRA)); r.dc = -6; r.tono = 'mal'; r.lineas.push('Necesita más confianza para firmar (' + Math.round(n.conf) + ' de ' + umbral + ').'); }
+      else { di(U.pick(NO_CIERRA)); r.dc = -6; r.tono = 'mal'; r.lineas.push(d.poker ? 'No firma. Su cara no dice nada: lee sus gestos.' : 'Necesita más confianza para firmar (' + Math.round(n.conf) + ' de ' + umbral + ').'); }
     } else if (tipo === 'irse') {
       r.fin = 'irse';
     }
-    n.conf = U.clamp(n.conf + r.dc, 0, 100);
-    n.precio = Math.max(Math.round(d.pide * 0.6), n.precio + r.dp);
+    aplicar(d, n, r);
     if (!r.fin) {
-      n.pac--;
+      n.pac--; n.turno++;
       if (n.conf <= 0) { r.fin = 'ofendido'; r.lineas.push(nom + ' se ofende y da la reunión por terminada.'); }
       else if (n.pac <= 0) { r.fin = 'cansado'; r.lineas.push(nom + ' se cansa y se levanta de la mesa.'); }
+      else if (d.rival && !n.rivalHecho && n.turno >= d.rival.turno) {
+        n.rivalHecho = true; n.pac = Math.max(1, n.pac - 1);
+        d.rival.oferta = Math.round(Math.max(n.precio, d.pide * 0.88) * U.rnd(1.03, 1.09) / 1000) * 1000;
+        r.evento = { tipo: 'rival' };
+      } else if (d.giro && !n.giroHecho && n.turno >= d.giro.turno) {
+        n.giroHecho = true; r.evento = { tipo: 'giro', id: d.giro.id };
+        if (H.GIROS[d.giro.id].alEntrar) { var ae = H.GIROS[d.giro.id].alEntrar; if (ae.pac) n.pac = Math.max(1, n.pac + ae.pac); }
+      }
     }
+    return r;
+  };
+
+  // Otro comprador pone una oferta encima de la mesa.
+  H.responderRival = function (s, d, n, op) {
+    var mot = H.MOTIVOS[d.motivo], nom = d.dueno.nombre.toUpperCase(), r = nuevoR(), of = d.rival.oferta;
+    function di(t) { r.lineas.push(nom + ': «' + t + '»'); }
+    function falla(txt) { r.dc = -6; r.dp = Math.max(0, Math.round(of * 0.98) - n.precio); di(txt); r.lineas.push('No era lo que le importaba: el precio sube hacia la otra oferta.'); r.tono = 'mal'; }
+    if (op === 'igualar') { r.dp = Math.max(0, of - n.precio); r.dc = 4; di('Si pagas lo mismo, prefiero tratar contigo.'); r.lineas.push('Has igualado. El precio sube a ' + H.eur(Math.max(of, n.precio)) + '.'); }
+    else if (op === 'certeza') {
+      if (mot.quiere.indexOf('rapido') >= 0) { r.dc = 12; di('Eso me vale más que unos euros. Seguimos tú y yo.'); r.lineas.push('¡Le has ganado sin subir precio! Le importaba la rapidez.'); r.tono = 'bien'; s.stats.rivales = (s.stats.rivales || 0) + 1; }
+      else falla('La prisa no es lo que más me importa…');
+      r.aprende.push('cierre_rapido', 'competencia');
+    } else if (op === 'gente') {
+      if (mot.quiere.indexOf('legado') >= 0) { r.dc = 12; di('Ellos no me han preguntado por mi gente. Tú sí.'); r.lineas.push('¡Le has ganado sin subir precio! Le importaba su legado.'); r.tono = 'bien'; s.stats.rivales = (s.stats.rivales || 0) + 1; }
+      else falla('Mi gente sabrá apañarse. Hablemos de números.');
+      r.aprende.push('legado', 'competencia');
+    } else { r.fin = 'rival'; di('Pues me voy con ellos. Suerte.'); r.lineas.push('Se queda la empresa ' + d.rival.n + '.'); r.aprende.push('competencia'); }
+    aplicar(d, n, r);
+    return r;
+  };
+
+  H.aplicarGiro = function (s, d, n, id, i) {
+    var G = H.GIROS[id], o = G.ops[i], ef = o.ef || {}, r = nuevoR();
+    r.dc = ef.conf || 0;
+    if (ef.bonus && ef.bonus.motivos.indexOf(d.motivo) >= 0) { r.dc += ef.bonus.conf; r.lineas.push(ef.bonus.txt); }
+    if (ef.pac) n.pac = Math.max(1, Math.min(n.pacMax + 2, n.pac + ef.pac));
+    if (ef.suelo) n.suelo = Math.round(n.precio * 0.97);
+    if (ef.datos) {
+      var conDatos = d.banderas.some(function (b) { return b.vista; });
+      if (conDatos) { n.suelo = 0; r.dc += 5; r.lineas.push('Tus datos convencen al gestor. El precio sigue abierto.'); }
+      else { n.suelo = Math.round(n.precio * 0.97); r.dc -= 5; r.lineas.push('Sin datos de la due diligence, el gestor gana: ya no bajará de ' + H.eur(n.suelo) + '.'); }
+    }
+    if (ef.albert) s.albert = U.clamp(s.albert + ef.albert, 0, 100);
+    if (o.aprende) r.aprende.push(o.aprende);
+    r.lineas.push(o.por);
+    r.tono = r.dc > 3 ? 'bien' : r.dc < 0 ? 'mal' : 'neutro';
+    aplicar(d, n, r);
     return r;
   };
 
@@ -460,7 +570,8 @@ var H = window.H || (window.H = {});
     s.empresas.forEach(function (c) { v += H.valorEmpresa(s, c) - H.deudaEmpresa(c); });
     return v;
   };
-  H.actualizarParte = function (s) { s.tuParte = Math.max(0, 0.25 * (H.nav(s) - s.capital)); return s.tuParte; };
+  H.actualizarParte = function (s) { s.tuParte = 0.25 * (H.nav(s) - s.capital); return s.tuParte; };
+  H.parteDe = function (s, c) { return 0.25 * (H.valorEmpresa(s, c) - H.deudaEmpresa(c) - c.invertido); };
 
   H.puedePalanca = function (s, c, id) {
     var P = H.PALANCAS[id];
@@ -491,7 +602,7 @@ var H = window.H || (window.H = {});
       c.gerente = true; c.ebitda -= sueldo; c.dep = Math.min(c.dep, 0.2); s.stats.gerentes++;
       r.lineas.push('Contratas gerente por ' + H.eur(sueldo) + '/año. La empresa ya no depende del dueño: el múltiplo sube y crece sola.'); r.xp = 60;
     } else if (id === 'automatizar') {
-      c.auto++; c.ebitda += c.ventas * 0.01; r.lineas.push('Facturas, pedidos y avisos en piloto automático. Margen +1 punto.');
+      c.auto++; c.ebitda += c.ventas * 0.006; r.lineas.push('Facturas, pedidos y avisos en piloto automático. Margen +0,6 puntos.');
     } else if (id === 'cuadro') {
       c.sistemas++;
       var oculto = c.riesgos.filter(function (x) { return !x.mit; })[0];
@@ -528,6 +639,7 @@ var H = window.H || (window.H = {});
 
   // ---------- Fin de mes ----------
   H.cerrarMes = function (s) {
+    H.actualizarParte(s);
     var rep = { mes: H.fecha(s.mes), lineas: [], eventos: [], avisos: [], parteAntes: s.tuParte };
     s.empresas.forEach(function (c) {
       var interes = c.deuda * 0.055 / 12, amort = c.deuda0 > 0 ? Math.min(c.deuda, c.deuda0 / 84) : 0;
@@ -538,7 +650,7 @@ var H = window.H || (window.H = {});
       if (c.transicion > 0) { c.transicion--; c.dep = Math.max(0.35, c.dep - 0.025); }
       c.usadas = {};
       c.hist.push(Math.round(c.ebitda)); if (c.hist.length > 24) c.hist.shift();
-      rep.lineas.push({ nombre: c.nombre, sec: c.sec, flujo: flujo });
+      rep.lineas.push({ nombre: c.nombre, sec: c.sec, flujo: flujo, id: c.id });
       if (c.earnout && s.mes + 1 >= c.earnout.mes) {
         if (c.ebitda >= c.earnout.base * 0.9) { s.caja -= c.earnout.importe; c.invertido += c.earnout.importe; rep.avisos.push('🎯 Earn-out de ' + c.nombre + ': se cumplieron objetivos. Pagas ' + H.eur(c.earnout.importe) + '.'); }
         else rep.avisos.push('🎯 Earn-out de ' + c.nombre + ': no se cumplieron objetivos. Te ahorras ' + H.eur(c.earnout.importe) + '.');
@@ -569,7 +681,7 @@ var H = window.H || (window.H = {});
     }
     s.mes++; s.energia = s.energiaMax;
     H.actualizarParte(s);
-    rep.parteDespues = s.tuParte;
+    rep.parteDespues = s.tuParte; s.parteMes = s.tuParte;
     return rep;
   };
 

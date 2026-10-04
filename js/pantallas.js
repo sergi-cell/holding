@@ -20,7 +20,46 @@ var H = window.H || (window.H = {});
       if (n.id === 'broker') await P.broker();
       else if (n.deal) { var d = dealPorId(n.deal); if (d) await P.deal(d); }
       else if (n.vecino) await P.vecino(n);
+      else if (n.rol === 'albert') await P.albert();
+      else if (n.rol === 'auditora') await P.gimnasio();
+      else if (n.lineas) await UI.decir(n.lineas, { nombre: n.nombre });
     } finally { H.world.soltarNpcs(); }
+  };
+  // Muebles de los interiores.
+  A.usar = async function (o) {
+    var s = S();
+    if (o.accion === 'pc') { await UI.decir('Enciendes el ordenador. Tu cartera…'); await P.cartera(); }
+    else if (o.accion === 'cama') { if (await UI.si('¿Dormir y cerrar el mes?')) await P.cerrarMes(); }
+    else if (o.accion === 'misiones') await P.misiones();
+    else if (o.accion === 'opciones') await P.opciones();
+    else if (o.accion === 'libros') await P.dealdex();
+    else if (o.accion === 'gerente') { var c = empresaPorId(H.world.compActual()); if (c) await P.empresa(c); }
+    else if (o.accion === 'estatua') await UI.decir(['Placa: «OJO CLÍNICO — Racha de ' + s.nombre + ': 🔥 ' + s.racha + (s.racha === 1 ? ' día' : ' días') + '»', 'Mejor marca: ' + (s.mejorReto || 0) + ' aciertos de 6.']);
+    else if (o.txt) await UI.decir(o.txt);
+    await UI.tras();
+  };
+
+  // Lo que dicen los empleados de tu empresa: el estado de la empresa, contado por su gente.
+  P.comentarios = function (c) {
+    var l = [];
+    if (c.gerente) l.push(['El gerente nuevo ha puesto orden. Se nota.']);
+    else if (c.dep > 0.6) l.push(['Aquí todo lo decidía el antiguo dueño…', 'Cuando un cliente llama, nadie sabe qué contestar.']);
+    if (c.conc > 0.35) l.push(['Si el cliente grande estornuda, aquí nos constipamos todos.']);
+    if (c.recur < 0.45) l.push(['Cada mes empezamos de cero buscando proyectos.', 'Si tuviéramos contratos de mantenimiento…']);
+    if (c.sistemas === 0) l.push(['¿Los números del mes? Los saca la gestoría… en marzo.']);
+    if (c.auto >= 1) l.push(['Desde que automatizamos las facturas, salgo a mi hora.']);
+    if (c.precios >= 3) l.push(['Algún cliente se ha quejado de la última subida…']);
+    var RUMOR = {
+      laboral: ['Los de las furgonetas siguen de «autónomos»… ¿eso es legal?'], hacienda: ['Llegó una carta de Hacienda. El jefe anterior la guardó en un cajón.'],
+      cobros: ['Hay clientes que no pagan desde hace meses. Nadie les reclama.'], stock: ['El almacén está lleno de cajas que nadie pide desde 2022.'],
+      capex: ['La máquina grande hace un ruido raro últimamente…'], local: ['El dueño de la nave dice que «ya hablaremos» del alquiler.'],
+      cambio_control: ['El cliente grande preguntó si con el cambio de dueño seguía todo igual…'], concentracion: ['Medio año de trabajo depende de un solo cliente.'],
+      dependencia: ['Los clientes siguen llamando al antiguo dueño.'], fraude: ['Las cuentas de antes… mejor no preguntes.'],
+      addbacks: ['Ese «EBITDA ajustado» del que hablaba el dueño… aquí nadie lo ha visto.'], tendencia: ['Cada año vendemos un poco menos.'], pico: ['Aquel pedidazo del año pasado no se ha vuelto a repetir.']
+    };
+    c.riesgos.forEach(function (r) { if (RUMOR[r.id] && Math.random() < 0.7) l.unshift(RUMOR[r.id].concat(['(Pista: esto huele a riesgo. Ojo.)'])); });
+    if (l.length < 3) l.push(['¡Buenos días, jefe! Todo en orden por aquí.'], ['¿Usted es el nuevo socio? Encantada.']);
+    return l.slice(0, 3);
   };
   A.leer = async function (o) {
     if (o.tipo === 'tablon') return P.tablon();
@@ -28,14 +67,9 @@ var H = window.H || (window.H = {});
     await UI.decir(o.txt);
   };
   A.entrar = async function (pu) {
-    if (pu.tipo === 'edificio') {
-      if (pu.id === 'hq') return P.oficina();
-      if (pu.id === 'reto') return P.gimnasio();
-      if (pu.id === 'albert') return P.albert();
-      if (pu.id === 'dex') return P.dealdex();
-    }
+    if (pu.tipo === 'edificio') return H.world.entrarInterior(pu.id);
     if (pu.tipo === 'deal') { var d = dealPorId(pu.id); if (d) return P.deal(d); }
-    if (pu.tipo === 'empresa') { var c = empresaPorId(pu.id); if (c) return P.empresa(c); }
+    if (pu.tipo === 'empresa') { var c = empresaPorId(pu.id); if (c) { H.world.entrarInterior('empresa', c); if (tuto('interiorEmpresa')) UI.pista('El escritorio del gerente abre las palancas. Habla con tu gente.'); } }
   };
 
   // ================= VECINOS (enseñan conceptos) =================
@@ -57,10 +91,8 @@ var H = window.H || (window.H = {});
   P.broker = async function () {
     var s = S(), nom = { nombre: 'LA BRÓKER' };
     if (tuto('broker')) {
-      await UI.decir(['¡Hola, ' + s.nombre + '! Soy LA BRÓKER. Me entero de cada empresa que se vende en Villa Pyme.',
-        'Cuando un dueño quiere vender, su empresa aparece en un solar con el cartel SE VENDE. Él espera en la puerta.',
-        'Mi consejo: antes de negociar, 🔎 ANALIZA. Gasta ⚡ de tu tiempo, pero destapa las banderas rojas.',
-        'Y ojo: el tiempo ⚡ de cada mes se acaba. Cuando no te quede, cierra el mes en TU OFICINA.'], nom);
+      await UI.decir(['¡Hola, ' + s.nombre + '! Soy LA BRÓKER: sé quién vende en Villa Pyme.', 'Los dueños esperan en la puerta de su empresa. ❗ = empresa nueva.'], nom);
+      UI.pista('Antes de negociar, 🔎 ANALIZA: destapa las banderas rojas.');
     }
     if (!s.deals.length) { await UI.decir('Este mes no queda nada en venta. Cierra el mes en tu oficina y vuelve.', nom); return; }
     await UI.decir('Este mes tengo ' + s.deals.length + (s.deals.length === 1 ? ' empresa' : ' empresas') + ' en venta. Mira el tablón.', nom);
@@ -143,10 +175,7 @@ var H = window.H || (window.H = {});
       $('.slot-dueno', p.el).appendChild(UI.sprite(d.dueno.look, 'down', 4, 'respira'));
       $$('[data-a]', p.el).forEach(function (b) { b.onclick = function () { H.audio.sfx_('ok'); p.cerrar(); res(b.dataset.a); }; });
       var f = p.focos(); if (f[0]) p.enfocar(f[0]);
-      if (tuto('ficha')) setTimeout(function () {
-        UI.decir(['Fíjate en el MÚLTIPLO: precio ÷ EBITDA. Si pide mucho más de lo normal en su sector, sospecha.',
-          'Las etiquetas son PISTAS, no pruebas. Lo que de verdad cuenta lo destapa el 🔎 ANÁLISIS.'], { nombre: 'ALBERT 📞' });
-      }, 350);
+      if (tuto('ficha')) UI.pista('Múltiplo = precio ÷ EBITDA. Si la aguja se sale de la zona verde, sospecha.');
     });
   }
   function pos(m) { return Math.max(0, Math.min(100, (m - 2) / 6 * 100)); }
@@ -292,7 +321,7 @@ var H = window.H || (window.H = {});
     var s = S();
     s.energia--; d.analizado = true;
     UI.hud();
-    if (tuto('dd')) await UI.decir(['DUE DILIGENCE: vas a ver 4 documentos de la empresa.', 'Si algo huele mal, TÓCALO. Si todo está bien, pulsa ✅ TODO LIMPIO.', 'Cada bandera que encuentres será un arma en la negociación.'], { nombre: 'ALBERT 📞' });
+    if (tuto('dd')) UI.pista('Toca lo que huela mal. Si todo está bien: ✅ TODO LIMPIO.');
     var r = await P.inspeccion(H.pantallasDD(s, d), {
       titulo: '🔎 DUE DILIGENCE', tiempo: 15,
       alAcierto: function (dt) { var b = d.banderas.filter(function (x) { return x.id === dt.tipo; })[0]; if (b && !b.vista) { b.vista = true; s.stats.banderas++; } }
@@ -307,65 +336,91 @@ var H = window.H || (window.H = {});
 
   // ================= COMBATE: LA NEGOCIACIÓN =================
   P.combate = async function (d) {
-    var s = S(), car = H.CARACTERES[d.car], mot = H.MOTIVOS[d.motivo], NOM = nombreDueno(d);
+    var s = S(), car = H.CARACTERES[d.car], NOM = nombreDueno(d);
     s.energia--; UI.hud();
     H.audio.sfx_('combate'); H.audio.jingle('encuentro', d.pide >= 2000000 ? 'jefe' : 'combate', 2600);
     await UI.transicion('combate');
     var n = H.nego(s, d), xpC = 0;
     var p = UI.panel('<div class="batalla"><div class="campo">' +
       '<div class="info rival"><div class="f1"><b>' + esc(NOM) + '</b><span>Nv.' + d.dueno.edad + '</span></div><div class="car"></div>' +
-      '<div class="hpfila"><label>CONF</label><div class="hp"><span class="fill"></span><i class="umbral"><em>FIRMA</em></i></div></div><div class="pac"></div></div>' +
-      '<div class="plat rival"><div class="humor"></div><div class="slot"></div></div>' +
+      '<div class="hpfila"><label>CONF</label><div class="hp' + (d.poker ? ' poker' : '') + '"><span class="fill"></span><i class="umbral"><em>FIRMA</em></i></div></div><div class="pac"></div></div>' +
+      '<div class="plat rival"><div class="humor"></div><div class="gesto"></div><div class="slot"></div></div>' +
       '<div class="plat yo"><div class="slot"></div></div>' +
       '<div class="info yo"><div class="f1"><b>' + esc(s.nombre) + '</b><span class="emp">' + H.sector(d.sec).e + '</span></div>' +
       '<div class="precio"><small>PRECIO EN LA MESA</small><b></b></div><div class="pide"></div><div class="cubre"></div></div>' +
       '</div></div>', { clase: 'p-batalla', cerrable: false, b: function () {} });
     var rivalSpr = UI.sprite(d.dueno.look, 'down', 6, 'rival-spr entra-der'), yoSpr = UI.sprite(H.LOOK_JUGADOR, 'up', 6, 'yo-spr entra-izq');
     $('.plat.rival .slot', p.el).appendChild(rivalSpr); $('.plat.yo .slot', p.el).appendChild(yoSpr);
-    var precioAnt = n.precio;
+    var precioAnt = n.precio, gestoAnt = '';
     function pintar() {
-      var umbral = H.umbralFirma(d, n);
-      $('.car', p.el).textContent = car.n + ' · ' + (d.motivoSabido ? mot.e + ' ' + mot.n : '❓ motivo');
+      var umbral = H.umbralFirma(d, n), mm = H.motivoMostrado(d);
+      $('.car', p.el).textContent = (d.poker ? '🃏 Cara de póker' : car.n) + ' · ' + (mm ? H.MOTIVOS[mm].e + ' ' + H.MOTIVOS[mm].n : '❓ motivo');
       var fill = $('.hp .fill', p.el); fill.style.width = n.conf + '%';
       fill.className = 'fill ' + (n.conf >= umbral ? 'verde' : n.conf >= 30 ? 'ambar' : 'rojo');
       $('.umbral', p.el).style.left = umbral + '%';
       var pips = ''; for (var k = 0; k < n.pacMax; k++) pips += '<i class="' + (k < n.pac ? 'on' : '') + '"></i>';
       $('.pac', p.el).innerHTML = '<label>PACIENCIA</label>' + pips;
-      $('.humor', p.el).textContent = n.conf >= umbral ? '😄' : n.conf >= 45 ? '🙂' : n.conf >= 25 ? '😐' : '😠';
+      $('.humor', p.el).textContent = d.poker ? '😶' : (n.conf >= umbral ? '😄' : n.conf >= 45 ? '🙂' : n.conf >= 25 ? '😐' : '😠');
+      var g = H.gesto(d, n), ge = $('.gesto', p.el);
+      if (g !== gestoAnt) { ge.textContent = g; ge.style.animation = 'none'; void ge.offsetWidth; ge.style.animation = ''; gestoAnt = g; }
       var pb = $('.precio b', p.el); UI.contar(pb, precioAnt, n.precio, 500); precioAnt = n.precio;
       var desc = 1 - n.precio / d.pide;
-      $('.pide', p.el).innerHTML = 'Pedía ' + H.eur(d.pide) + (desc > 0.001 ? ' · <b class="verde">−' + H.pct(desc) + '</b>' : '');
+      $('.pide', p.el).innerHTML = 'Pedía ' + H.eur(d.pide) + (desc > 0.001 ? ' · <b class="verde">−' + H.pct(desc) + '</b>' : desc < -0.001 ? ' · <b class="rojo">+' + H.pct(-desc) + '</b>' : '') + (n.suelo ? ' · 🔒' : '');
       $('.cubre', p.el).innerHTML = n.est.map(function (e) { return '<span title="' + esc(H.ESTRUCTURAS[e].n) + '">' + H.ESTRUCTURAS[e].e + '</span>'; }).join('') +
         d.banderas.filter(function (b) { return b.vista; }).map(function (b) { return '<span class="bfl' + (b.jugada ? ' usada' : '') + '">' + H.BANDERAS[b.id].e + '</span>'; }).join('');
     }
+    // Muestra el efecto de una jugada (o de un evento) con animación, sonido y frases.
+    async function efecto(r, anuncio) {
+      if (anuncio) await UI.decir(anuncio);
+      var info = $('.info.rival', p.el), mia = $('.info.yo', p.el);
+      rivalSpr.classList.remove('golpe', 'salta'); void rivalSpr.offsetWidth;
+      rivalSpr.classList.add(r.tono === 'mal' ? 'golpe' : 'salta');
+      H.audio.sfx_(r.tono === 'mal' ? 'mal' : r.tono === 'bien' ? 'bien' : 'mover');
+      if (r.dc && !d.poker) UI.flotar(info, (r.dc > 0 ? '+' : '') + r.dc + (r.dc > 0 ? ' 💚' : ' 💔'), r.dc > 0 ? 'verde' : 'rojo');
+      if (r.dp) UI.flotar(mia, (r.dp > 0 ? '+' : '') + H.eur(r.dp), r.dp < 0 ? 'verde' : 'rojo');
+      if (r.tono === 'bien') xpC += 12;
+      pintar();
+      UI.aprender(r.aprende);
+      if (r.lineas.length) await UI.decir(r.lineas);
+    }
     pintar();
     await UI.dormir(500);
-    await UI.decir(['¡' + NOM + ' ' + d.dueno.apellido.toUpperCase() + ' quiere VENDER ' + d.nombre.toUpperCase() + '!']);
-    if (tuto('combate')) await UI.decir([
-      'La barra CONF es su confianza en ti. Cuando llegue a la marca FIRMA, podrás cerrar.',
-      'PACIENCIA: cada jugada gasta un turno. Si se acaba, se levanta.',
-      'Primero PREGUNTA: el motivo de venta te dice qué estructura quiere. Ofrecer a ciegas sale caro.'], { nombre: 'ALBERT 📞' });
+    await UI.decir('¡' + NOM + ' ' + d.dueno.apellido.toUpperCase() + ' quiere VENDER ' + d.nombre.toUpperCase() + '!');
+    UI.limpiarPistas();
+    if (tuto('combate')) await UI.pista('Pregunta primero: su motivo te dice qué estructura quiere.');
+    else if (d.poker && tuto('poker')) await UI.pista('Cara de póker: no ves su confianza. Lee sus gestos.');
     var fin = null;
     while (!fin) {
       var m = await UI.elegir([{ t: 'PREGUNTAR', ico: '👂' }, { t: 'ESTRUCTURA', ico: '🤝' }, { t: 'BANDERAS', ico: '🚩' }, { t: 'OFERTA', ico: '💶' }],
         { cols: 2, cancelable: false, pregunta: '¿Qué hace ' + s.nombre + '?', clase: 'menu-batalla' });
       var jug = null;
       if (m === 0) {
-        var q = await UI.elegir([{ t: '¿Por qué vendes?', sub: d.motivoSabido ? 'Ya lo sabes' : 'Descubre su motivo' }, { t: 'Cuéntame tu historia', sub: 'Gana confianza escuchando' }, { t: '¿Qué te preocupa de vender?', sub: n.preocupa ? 'Ya te lo dijo' : 'Pista de lo que quiere' }, '↩ Volver'], { titulo: '👂 PREGUNTAR' });
-        if (q === 0) jug = ['motivo', null, 'PREGUNTAR POR QUÉ VENDE']; else if (q === 1) jug = ['historia', null, 'ESCUCHAR SU HISTORIA']; else if (q === 2) jug = ['preocupa', null, 'PREGUNTAR QUÉ LE PREOCUPA'];
+        var q = await UI.elegir([
+          { t: 'Por qué vende', ico: '❓', d: d.motivoSabido ? 'Ya te lo ha contado.' : 'Descubre su motivo de venta.' },
+          { t: 'Su historia', ico: '☕', d: 'Escucharle sube su confianza (cada vez menos).' },
+          { t: 'Qué le preocupa', ico: '😟', d: n.preocupa ? 'Ya te lo dijo.' : 'Te da una pista de lo que quiere de verdad.' },
+          { t: 'Repreguntar', ico: '🔍', off: !d.motivoSabido, d: '«¿Seguro que es solo eso?» Útil si algo no encaja… molesto si era verdad.' },
+          { t: 'Volver', ico: '↩', d: '' }], { titulo: '👂 PREGUNTAR', cols: 2, clase: 'rejilla', detalle: true, pregunta: 'Elige una pregunta.' });
+        if (q === 0) jug = ['motivo', null, 'PREGUNTAR POR QUÉ VENDE']; else if (q === 1) jug = ['historia', null, 'ESCUCHAR SU HISTORIA'];
+        else if (q === 2) jug = ['preocupa', null, 'PREGUNTAR QUÉ LE PREOCUPA']; else if (q === 3) jug = ['repreguntar', null, 'REPREGUNTAR'];
       } else if (m === 1) {
         var ks = Object.keys(H.ESTRUCTURAS).filter(function (k) { return n.est.indexOf(k) < 0; });
-        var e = await UI.elegir(ks.map(function (k) { var E = H.ESTRUCTURAS[k]; return { t: E.n, ico: E.e, sub: E.d }; }).concat(['↩ Volver']), { titulo: '🤝 ESTRUCTURA' });
+        var e = await UI.elegir(ks.map(function (k) { var E = H.ESTRUCTURAS[k]; return { t: E.c || E.n, ico: E.e, d: E.n + ': ' + E.d }; }).concat([{ t: 'Volver', ico: '↩', d: '' }]),
+          { titulo: '🤝 ESTRUCTURA', cols: 3, clase: 'rejilla', detalle: true, pregunta: 'Elige qué ofrecerle.' });
         if (e >= 0 && e < ks.length) jug = ['estructura', ks[e], 'PROPONER ' + H.ESTRUCTURAS[ks[e]].n.toUpperCase()];
       } else if (m === 2) {
         var bs = d.banderas.filter(function (b) { return b.vista && !b.jugada; });
-        var ops = bs.map(function (b) { var B = H.BANDERAS[b.id]; return { t: B.n, ico: B.e, sub: B.fatal ? 'Esto no se negocia…' : 'Baja el precio con datos' }; });
-        if (!bs.length) ops.push({ t: d.analizado ? 'No te quedan banderas' : 'Sin analizar: no tienes datos', off: true });
-        var bi = await UI.elegir(ops.concat(['↩ Volver']), { titulo: '🚩 BANDERAS' });
+        var ops = bs.map(function (b) { var B = H.BANDERAS[b.id]; return { t: B.n, ico: B.e, d: B.fatal ? 'Esto no se negocia…' : 'Baja el precio con datos de la due diligence.' }; });
+        if (!bs.length) ops.push({ t: d.analizado ? 'Sin banderas' : 'Sin analizar', ico: '🤷', off: true });
+        var bi = await UI.elegir(ops.concat([{ t: 'Volver', ico: '↩', d: '' }]), { titulo: '🚩 BANDERAS', cols: 2, clase: 'rejilla', detalle: true, pregunta: bs.length ? 'Saca un dato.' : 'No tienes datos que sacar.' });
         if (bi >= 0 && bi < bs.length) jug = ['bandera', bs[bi].id, 'SACAR ' + H.BANDERAS[bs[bi].id].n.toUpperCase()];
       } else if (m === 3) {
         var um = H.umbralFirma(d, n);
-        var o = await UI.elegir([{ t: 'Proponer cierre: ' + H.eur(n.precio), ico: '✍️', sub: 'Firma si su confianza llega a ' + um }, { t: 'Anclar bajo (−7%)', ico: '⚓', sub: 'Solo funciona con mucha confianza' }, { t: 'Levantarse de la mesa', ico: '🚪', sub: 'Te vas. Sin trato.' }, '↩ Volver'], { titulo: '💶 OFERTA' });
+        var o = await UI.elegir([
+          { t: 'Cerrar', ico: '✍️', d: 'Proponer firmar a ' + H.eur(n.precio) + (d.poker ? '. Solo firma si confía lo bastante.' : '. Firma si su confianza llega a ' + um + '.') },
+          { t: 'Anclar −7%', ico: '⚓', d: 'Bajar el precio de golpe. Solo funciona con mucha confianza.' },
+          { t: 'Levantarse', ico: '🚪', d: 'Te vas sin trato. A veces es lo correcto.' },
+          { t: 'Volver', ico: '↩', d: '' }], { titulo: '💶 OFERTA', cols: 2, clase: 'rejilla', detalle: true, pregunta: 'Elige.' });
         if (o === 0) jug = ['cerrar', null, 'PROPONER EL CIERRE']; else if (o === 1) jug = ['ancla', null, 'ANCLAR BAJO']; else if (o === 2) jug = ['irse', null, 'LEVANTARSE'];
       }
       if (!jug) continue;
@@ -373,18 +428,31 @@ var H = window.H || (window.H = {});
       H.audio.sfx_('golpe');
       yoSpr.classList.remove('ataca'); void yoSpr.offsetWidth; yoSpr.classList.add('ataca');
       var r = H.jugar(s, d, n, jug[0], jug[1]);
-      await UI.decir('¡' + s.nombre + ' usa ' + jug[2] + '!');
-      var info = $('.info.rival', p.el), mia = $('.info.yo', p.el);
-      rivalSpr.classList.remove('golpe', 'salta'); void rivalSpr.offsetWidth;
-      rivalSpr.classList.add(r.tono === 'mal' ? 'golpe' : 'salta');
-      H.audio.sfx_(r.tono === 'mal' ? 'mal' : r.tono === 'bien' ? 'bien' : 'mover');
-      if (r.dc) UI.flotar(info, (r.dc > 0 ? '+' : '') + r.dc + (r.dc > 0 ? ' 💚' : ' 💔'), r.dc > 0 ? 'verde' : 'rojo');
-      if (r.dp) UI.flotar(mia, H.eur(r.dp), 'verde');
-      if (r.tono === 'bien') xpC += 12;
-      pintar();
-      UI.aprender(r.aprende);
-      if (r.lineas.length) await UI.decir(r.lineas);
+      await efecto(r, '¡' + s.nombre + ' usa ' + jug[2] + '!');
+      if (n.sospecha && tuto('sospecha')) await UI.pista('Algo no encaja. Gana confianza y 🔍 repregunta.');
       fin = r.fin;
+      if (!fin && r.evento && r.evento.tipo === 'rival') {
+        H.audio.sfx_('combate');
+        var fl = document.createElement('div'); fl.className = 'rival-flag'; fl.textContent = '🦈'; $('.campo', p.el).appendChild(fl);
+        await UI.decir('🦈 ¡Llama ' + d.rival.n + '! Ofrece ' + H.eur(d.rival.oferta) + ' por la empresa.');
+        if (tuto('rival')) await UI.pista('Compite en lo que le importa, no solo en euros.');
+        var ro = await UI.elegir([
+          { t: 'Igualar', ico: '💶', d: 'Pagar lo mismo que ellos: ' + H.eur(Math.max(d.rival.oferta, n.precio)) + '.' },
+          { t: 'Certeza', ico: '⚡', d: '«Firmamos ya. Sin financiación pendiente, sin sorpresas.»' },
+          { t: 'Su gente', ico: '🫶', d: '«Con nosotros tu equipo y tu nombre siguen.»' },
+          { t: 'Soltar', ico: '👋', d: 'Que se vaya con ellos.' }], { cols: 2, clase: 'rejilla', detalle: true, cancelable: false, pregunta: '¿Cómo respondes?', titulo: '🦈 OTRO COMPRADOR' });
+        var rr = H.responderRival(s, d, n, ['igualar', 'certeza', 'gente', 'soltar'][ro]);
+        await efecto(rr);
+        fl.remove();
+        fin = rr.fin;
+      } else if (!fin && r.evento && r.evento.tipo === 'giro') {
+        var G = H.GIROS[r.evento.id];
+        H.audio.sfx_('puerta');
+        pintar();
+        await UI.decir(G.e + ' ' + G.t);
+        var gi = await UI.elegir(G.ops.map(function (op) { return { t: op.t }; }), { cancelable: false, pregunta: G.e + ' ¿Qué haces?' });
+        await efecto(H.aplicarGiro(s, d, n, r.evento.id, gi));
+      }
     }
     if (xpC) UI.xp(xpC);
     if (fin === 'compra') {
@@ -394,7 +462,7 @@ var H = window.H || (window.H = {});
       await P.financiar(d, n);
     } else {
       p.cerrar();
-      H.audio.tema('pueblo');
+      H.audio.tema(H.world.tema());
       if (fin === 'irse') {
         var ev = H.evaluarIrse(s, d, n);
         s.deals = s.deals.filter(function (x) { return x.id !== d.id; });
@@ -409,6 +477,9 @@ var H = window.H || (window.H = {});
       } else if (fin === 'ofendido') {
         s.deals = s.deals.filter(function (x) { return x.id !== d.id; });
         await UI.decir('Has perdido este deal. Sin confianza no hay trato.');
+      } else if (fin === 'rival') {
+        s.deals = s.deals.filter(function (x) { return x.id !== d.id; });
+        await UI.decir('Has perdido la empresa frente a otro comprador. La próxima, compite en lo que le importa.');
       }
       H.world.rebuild();
     }
@@ -447,21 +518,23 @@ var H = window.H || (window.H = {});
       $('[data-x]', p.el).onclick = async function () {
         H.audio.sfx_('atras'); p.cerrar(); d.bloqueado = s.mes;
         await UI.decir('Renuncias por ahora. ' + nombreDueno(d) + ' te esperará hasta el mes que viene.');
-        H.audio.tema('pueblo'); res();
+        H.audio.tema(H.world.tema()); res();
       };
       var fs = p.focos(); if (fs[0]) p.enfocar(fs[0]);
-      if (tuto('financiar')) setTimeout(function () { UI.decir(['El banco multiplica lo que ganas… y lo que pierdes.', 'Regla de oro: que la cuota anual no pase del 50% del EBITDA.'], { nombre: 'ALBERT 📞' }); }, 300);
+      if (tuto('financiar')) UI.pista('Regla de oro: que la cuota del banco no pase del 50% del EBITDA.');
     });
   };
 
   P.resultadoCompra = async function (r, d, n) {
     var s = S(), sec = H.sector(d.sec), est = '';
     for (var i = 0; i < 3; i++) est += '<span class="estrella' + (i < r.estrellas ? ' on' : '') + '" style="animation-delay:' + (0.3 + i * 0.35) + 's">★</span>';
+    var parteAntes = s.tuParte; H.actualizarParte(s); var parteEmp = H.parteDe(s, r.empresa);
     var veredicto = r.estrellas === 3 ? 'Compra de manual: buen precio y riesgos cubiertos.' : r.estrellas === 2 ? 'Buen precio, pero algún riesgo se quedó sin cubrir.' : 'Has pagado más de lo que vale. Toca arreglarla a fondo.';
     await new Promise(function (res) {
       var p = UI.panel('<div class="celebra compra"><div class="slot-edif"></div><h2>¡ES TUYA!</h2><p class="nombre">' + sec.e + ' ' + esc(d.nombre) + '</p><div class="estrellas">' + est + '</div>' +
         '<div class="desglose"><div><span>Has pagado</span><b>' + H.eur(n.precio) + '</b></div><div><span>Valor estimado por Albert</span><b class="' + (r.valorJusto >= n.precio ? 'verde' : 'rojo') + '">' + H.eur(r.valorJusto) + '</b></div>' +
         '<div><span>Confianza de Albert</span><b class="' + (r.albert >= 0 ? 'verde' : 'rojo') + '">' + (r.albert >= 0 ? '+' : '') + r.albert + ' ❤</b></div></div>' +
+        '<p class="parte-linea">⭐ Tu parte en esta empresa: <b class="' + (parteEmp >= 0 ? 'verde' : 'rojo') + '">' + (parteEmp >= 0 ? '+' : '') + H.eur(parteEmp) + '</b><br><small>' + (parteEmp >= 0 ? '¡Ganas desde el primer día!' : 'Empiezas en rojo: arréglala y dale la vuelta.') + '</small></p>' +
         '<p class="veredicto">' + esc(veredicto) + '</p><button class="btn grande" data-f>¡A POR ELLA!</button></div><canvas class="confeti"></canvas>', { clase: 'cel', cerrable: false, b: function () {} });
       $('.slot-edif', p.el).appendChild(UI.edificioCanvas(sec, true, 2.5));
       UI.confeti($('canvas.confeti', p.el));
@@ -469,8 +542,9 @@ var H = window.H || (window.H = {});
       b.onclick = function () { H.audio.sfx_('ok'); p.cerrar(); res(); };
     });
     UI.xp(r.xp);
-    H.audio.tema('pueblo');
-    if (tuto('primeraCompra')) await UI.decir(['¡Enhorabuena, socio! Tu empresa ya tiene nuestra bandera.', 'Entra en ella para usar PALANCAS: subir precios, contratar gerente, automatizar…', 'Cada mes la empresa genera caja. Y si sube su valor, sube TU PARTE ⭐ (el 25%).'], { nombre: 'ALBERT 📞' });
+    UI.parteCambio(parteAntes);
+    H.audio.tema(H.world.tema());
+    if (tuto('primeraCompra')) UI.pista('Entra en tu empresa (bandera amarilla) y usa sus palancas.');
     await UI.tras();
   };
 
@@ -485,17 +559,19 @@ var H = window.H || (window.H = {});
       if (motivo) { await UI.decir(motivo); continue; }
       var extra;
       if (acc === 'comercial') extra = await P.retoVentas();
-      var antes = c.ebitda, multAntes = H.multSalida(S(), c);
+      var antes = c.ebitda, multAntes = H.multSalida(S(), c); H.actualizarParte(S()); var parteAntes = S().tuParte;
       var r = H.palanca(S(), c, acc, extra);
       H.audio.sfx_(r.xp >= 20 ? 'bien' : 'mal');
       var cambio = c.ebitda - antes, dm = H.multSalida(S(), c) - multAntes;
       if (Math.abs(cambio) > 1) r.lineas.push('EBITDA: ' + H.eur(antes) + ' → ' + H.eur(c.ebitda));
       if (Math.abs(dm) > 0.01) r.lineas.push('Múltiplo de venta: ' + x1(multAntes) + ' → ' + x1(H.multSalida(S(), c)) + (dm > 0 ? ' 📈' : ' 📉'));
+      var dParte = UI.parteCambio(parteAntes);
+      if (Math.abs(dParte) >= 500) r.lineas.push('⭐ Tu parte: ' + (dParte > 0 ? '+' : '') + H.eur(dParte));
       await UI.decir(r.lineas);
       UI.aprender(r.aprende); UI.xp(r.xp);
       await UI.tras();
     }
-    H.audio.tema('pueblo');
+    H.audio.tema(H.world.tema());
     await UI.tras();
   };
   function sparkline(hist) {
@@ -519,6 +595,7 @@ var H = window.H || (window.H = {});
         '<div class="meds">' + medidor('Depende del dueño', '👑', c.dep, true) + medidor('Cliente más grande', '🎯', c.conc, true) + medidor('Recurrente', '🔁', c.recur, false) +
         '<div class="med"><span class="l">📊 Cuadro de mando</span><span class="pips">' + [0, 1, 2].map(function (k) { return '<i class="' + (k < c.sistemas ? 'on' : '') + '"></i>'; }).join('') + '</span><span class="v">' + (c.gerente ? '🧑‍💼 gerente ✓' : '') + '</span></div></div>' +
         (detectados.length ? '<div class="riesgos">' + detectados.map(function (r) { var B = H.BANDERAS[r.id]; return '<span>⚠️ ' + B.e + ' ' + esc(B.n) + '</span>'; }).join('') + '</div>' : '') +
+        '<p class="parte-linea">⭐ Tu parte en esta empresa: <b class="' + (H.parteDe(s, c) >= 0 ? 'verde' : 'rojo') + '">' + (H.parteDe(s, c) >= 0 ? '+' : '') + H.eur(H.parteDe(s, c)) + '</b></p>' +
         '<div class="desglose mini"><div><span>Invertido por el fondo</span><b>' + H.eur(c.invertido) + '</b></div><div><span>Deudas (banco, vendedor, earn-out)</span><b>' + H.eur(deuda) + '</b></div><div><span>Valor neto hoy</span><b class="' + (neto >= c.invertido ? 'verde' : 'rojo') + '">' + H.eur(neto) + '</b></div></div>' +
         '<h3 class="sec">PALANCAS · te quedan ' + s.energia + ' ⚡</h3><div class="palancas">' +
         Object.keys(H.PALANCAS).map(function (k) {
@@ -530,7 +607,7 @@ var H = window.H || (window.H = {});
       $$('[data-p]', p.el).forEach(function (b) { b.onclick = function () { if (b.disabled) return; H.audio.sfx_('ok'); p.cerrar(); res(b.dataset.p); }; });
       $('[data-x]', p.el).onclick = function () { H.audio.sfx_('atras'); p.cerrar(); res(null); };
       var fs = p.focos(); if (fs[0]) p.enfocar(fs[0]);
-      if (tuto('empresa')) setTimeout(function () { UI.decir(['Esta es tu empresa. Cada palanca gasta ⚡ de tu tiempo.', 'El truco del oficio: que funcione SIN el dueño (👑 abajo), con clientes repartidos (🎯 abajo) y cuotas (🔁 arriba). Eso sube el MÚLTIPLO.'], { nombre: 'ALBERT 📞' }); }, 300);
+      if (tuto('empresa')) UI.pista('Menos 👑 y 🎯, más 🔁 y 📊 = más múltiplo al vender.');
     });
   }
 
@@ -602,7 +679,7 @@ var H = window.H || (window.H = {});
       else if (o === 3) await P.opciones();
       else break;
     }
-    H.audio.tema('pueblo');
+    H.audio.tema(H.world.tema());
   };
 
   P.cartera = function () {
@@ -610,7 +687,7 @@ var H = window.H || (window.H = {});
     var nav = H.nav(s);
     return new Promise(function (res) {
       var html = '<div class="cab"><h2>💼 CARTERA DEL HOLDING</h2><p>' + esc(H.fecha(s.mes)) + '</p></div>' +
-        '<div class="gordo"><small>⭐ TU PARTE (25%)</small><b class="oro cnt-parte">0 €</b><span>Realizado: ' + H.eur(s.realizado * 0.25) + '</span></div>' +
+        '<div class="gordo"><small>⭐ TU PARTE (25%)</small><b class="oro cnt-parte' + (s.tuParte < 0 ? ' neg' : '') + '">0 €</b><span>Realizado: ' + H.eur(s.realizado * 0.25) + '</span></div>' +
         '<div class="desglose"><div><span>Valor del holding</span><b>' + H.eur(nav) + '</b></div><div><span>Capital de Albert</span><b>' + H.eur(s.capital) + '</b></div><div><span>Caja del fondo</span><b>' + H.eur(s.caja) + '</b></div>' +
         '<div><span>Confianza de Albert</span><b>' + s.albert + ' ❤</b></div></div><div class="lista">' +
         (s.empresas.length ? s.empresas.map(function (c) {
@@ -635,7 +712,7 @@ var H = window.H || (window.H = {});
     var rep = H.cerrarMes(s);
     await new Promise(function (res) {
       var html = '<div class="cab"><h2>🌙 CIERRE DE ' + esc(rep.mes.toUpperCase()) + '</h2></div><div class="informe">' +
-        (rep.lineas.length ? rep.lineas.map(function (l) { return '<div class="linea"><span>' + H.sector(l.sec).e + ' ' + esc(l.nombre) + '</span><b class="' + (l.flujo >= 0 ? 'verde' : 'rojo') + '">' + (l.flujo >= 0 ? '+' : '') + H.eur(l.flujo) + '</b></div>'; }).join('') : '<p class="vacio">Sin empresas todavía: este mes no entra caja.</p>') +
+        (rep.lineas.length ? rep.lineas.map(function (l) { return '<div class="linea"><span>' + H.sector(l.sec).e + ' ' + esc(l.nombre) + '<small> caja del mes</small></span><b class="' + (l.flujo >= 0 ? 'verde' : 'rojo') + '">' + (l.flujo >= 0 ? '+' : '') + H.eur(l.flujo) + '</b></div>'; }).join('') : '<p class="vacio">Sin empresas todavía: este mes no entra caja.</p>') +
         '</div><div class="desglose"><div><span>Caja del fondo</span><b class="cnt-caja"></b></div></div>' +
         '<div class="gordo"><small>⭐ TU PARTE (25%)</small><b class="oro cnt-parte"></b><span class="' + (rep.parteDespues >= parteAntes ? 'verde' : 'rojo') + '">' + (rep.parteDespues >= parteAntes ? '▲ +' : '▼ ') + H.eur(rep.parteDespues - parteAntes) + '</span></div>' +
         (rep.avisos.length ? '<div class="avisos-mes">' + rep.avisos.map(function (a) { return '<p>' + esc(a) + '</p>'; }).join('') + '</div>' : '') +
@@ -654,6 +731,7 @@ var H = window.H || (window.H = {});
     if (rep.nuevos) await UI.decir('¡Hay ' + rep.nuevos + (rep.nuevos === 1 ? ' empresa nueva' : ' empresas nuevas') + ' en venta! Busca los ❗ en el mapa.', { nombre: 'LA BRÓKER 📱' });
     if (!H.retoHecho(s)) UI.aviso('👁️ El OJO CLÍNICO de hoy te espera', 'nueva');
     UI.xp(20);
+    H.audio.tema(H.world.tema());
     await UI.tras();
     return true;
   };
@@ -683,14 +761,14 @@ var H = window.H || (window.H = {});
   P.gimnasio = async function () {
     var s = S(), nom = { nombre: 'LA AUDITORA' };
     H.audio.tema('calma');
-    if (tuto('gimnasio')) await UI.decir(['Bienvenido al OJO CLÍNICO. Soy LA AUDITORA.', 'Cada día te enseño 6 documentos rápidos. Tú decides: ¿bandera roja o todo limpio?', 'Repito más lo que más fallas. Así se entrena el ojo. Y si vienes cada día, tu racha 🔥 crece.'], nom);
-    if (H.retoHecho(s)) { await UI.decir(['Ya has entrenado hoy. Racha: 🔥 ' + s.racha + (s.racha === 1 ? ' día' : ' días') + '.', 'Vuelve mañana. El ojo se entrena con constancia, no con atracones.'], nom); H.audio.tema('pueblo'); return; }
+    if (tuto('gimnasio')) await UI.decir(['Soy LA AUDITORA. Cada día, 6 documentos: ¿bandera roja o todo limpio?', 'Repito más lo que fallas. Ven cada día y tu racha 🔥 crece.'], nom);
+    if (H.retoHecho(s)) { await UI.decir(['Ya has entrenado hoy. Racha: 🔥 ' + s.racha + (s.racha === 1 ? ' día' : ' días') + '.', 'Vuelve mañana. El ojo se entrena con constancia, no con atracones.'], nom); H.audio.tema(H.world.tema()); return; }
     var ok = await UI.si('¿Empezamos el entrenamiento de hoy?', nom);
-    if (!ok) { H.audio.tema('pueblo'); return; }
+    if (!ok) { H.audio.tema(H.world.tema()); return; }
     H.audio.tema('reto');
     var r = await P.inspeccion(H.pantallasReto(s, 6), { titulo: '👁️ OJO CLÍNICO', tiempo: 9 });
     var bonus = H.completarReto(s, r.aciertos, r.resultados.length);
-    H.audio.jingle('victoria', 'pueblo');
+    H.audio.jingle('victoria', H.world.tema());
     await UI.celebrar('<div class="cel-ico fuego">🔥</div><h2>RACHA: ' + s.racha + (s.racha === 1 ? ' DÍA' : ' DÍAS') + '</h2><p>' + r.aciertos + ' de ' + r.resultados.length + ' aciertos' + (r.combo > 1 ? ' · combo ×' + r.combo : '') + '</p>' +
       (r.aciertos === r.resultados.length ? '<p class="oro">¡PERFECTO! +100 XP extra</p>' : '') + '<p class="oro">+' + (bonus + r.xp) + ' XP</p>');
     UI.xp(bonus + r.xp);
@@ -716,7 +794,7 @@ var H = window.H || (window.H = {});
     else l = ['Vamos bien, pero esto es una maratón.', H.u.pick(['Recuerda: se gana al COMPRAR. Lo que pagas de más no lo recuperas nunca.', 'Una empresa que depende de su dueño vale menos. Arregla eso y el múltiplo sube solo.', 'Sin sorpresas, por favor. Las malas noticias, rápido y por escrito.'])];
     await UI.decir(l, nom);
     UI.aprender('socio_capital');
-    H.audio.tema('pueblo');
+    H.audio.tema(H.world.tema());
     await UI.tras();
   };
 
@@ -730,14 +808,14 @@ var H = window.H || (window.H = {});
           var c = H.CODEX[k], t = s.codex[k], st = H.estrellasDominio(s, k);
           return '<button class="carta r' + c.rar + (t ? '' : ' bloq') + '" data-f data-k="' + k + '"><span class="num">#' + String(i + 1).padStart(2, '0') + '</span><span class="e">' + (t ? c.e : '❓') + '</span><b>' + (t ? esc(c.n) : '???') + '</b><span class="st">' + (t ? '★★★'.slice(0, st) + '☆☆☆'.slice(0, 3 - st) : '') + '</span></button>';
         }).join('') + '</div><button class="btn" data-f data-x>CERRAR</button>';
-      var p = UI.panel(html, { clase: 'p-dex', alCerrar: function () { H.audio.tema('pueblo'); res(); } });
+      var p = UI.panel(html, { clase: 'p-dex', alCerrar: function () { H.audio.tema(H.world.tema()); res(); } });
       $$('[data-k]', p.el).forEach(function (b) {
         b.onclick = async function () {
           var k = b.dataset.k, c = H.CODEX[k];
           if (!s.codex[k]) { H.audio.sfx_('choque'); UI.aviso('🔒 Aún no la has descubierto. Analiza, negocia y habla con los vecinos.'); return; }
           H.audio.sfx_('nueva');
           await new Promise(function (r2) {
-            var q = UI.panel('<div class="carta-grande r' + c.rar + '"><span class="rar">' + ['', 'COMÚN', 'RARA', 'ÉPICA', 'LEGENDARIA'][c.rar] + '</span><div class="e">' + c.e + '</div><h2>' + esc(c.n) + '</h2><p>' + esc(c.d) + '</p><p class="regla">💡 ' + esc(c.r) + '</p><button class="btn" data-f>VOLVER</button></div>', { clase: 'p-carta', alCerrar: r2 });
+            var q = UI.panel('<div class="carta-grande r' + c.rar + '"><span class="rar">' + ['', 'COMÚN', 'RARA', 'ÉPICA', 'LEGENDARIA'][c.rar] + '</span><div class="e">' + c.e + '</div><h2>' + esc(c.n) + '</h2><p>' + esc(c.d) + '</p><p class="regla">💡 ' + esc(c.r) + '</p>' + (c.dato ? '<p class="dato">📊 <b>Dato real (España):</b> ' + esc(c.dato) + '</p>' : '') + '<button class="btn" data-f>VOLVER</button></div>', { clase: 'p-carta', alCerrar: r2 });
             var bb = $('button', q.el); q.enfocar(bb); bb.onclick = function () { H.audio.sfx_('atras'); q.cerrar(); };
           });
         };
@@ -818,7 +896,7 @@ var H = window.H || (window.H = {});
     else if (o === 2) await P.misiones();
     else if (o === 3) await P.cerrarMes();
     else if (o === 4) await P.opciones();
-    H.audio.tema('pueblo');
+    H.audio.tema(H.world.tema());
     await UI.tras();
   };
 
@@ -861,7 +939,7 @@ var H = window.H || (window.H = {});
     H.world.colocar(); H.world.rebuild();
     await UI.decir(['¡' + nombre + '! Tu aventura en VILLA PYME empieza ahora.', 'Sal a la plaza y habla con LA BRÓKER: tiene tu primer deal.', 'Muévete con la cruceta. A para hablar y entrar. Mantén B para correr. START para el menú.'], nom);
     p.cerrar();
-    H.audio.tema('pueblo');
+    H.audio.tema(H.world.tema());
     H.guardar(H.estado);
     await UI.tras();
   };
@@ -906,7 +984,7 @@ var H = window.H || (window.H = {});
     H.audio.tema('titulo');
     var r = await P.titulo(!!guardado);
     if (r === 'nueva') { H.borrar(); await P.intro(); }
-    else { H.audio.tema('pueblo'); await UI.tras(); UI.aviso('📅 <b>' + esc(H.fecha(H.estado.mes)) + '</b> · ⚡ ' + H.estado.energia); }
+    else { H.audio.tema(H.world.tema()); await UI.tras(); UI.aviso('📅 <b>' + esc(H.fecha(H.estado.mes)) + '</b> · ⚡ ' + H.estado.energia); }
   };
   window.addEventListener('load', function () { P.arrancar(); });
 })();

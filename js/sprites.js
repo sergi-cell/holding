@@ -200,6 +200,120 @@ var H = window.H || (window.H = {});
     }
   };
 
+
+  // ================= INTERIORES =================
+  var SUELO = {
+    madera: function (x, px, py, tx, ty) {
+      x.fillStyle = '#c8955c'; x.fillRect(px, py, 16, 16);
+      x.fillStyle = '#a8743f'; for (var k = 0; k < 16; k += 4) x.fillRect(px, py + k + 3, 16, 1);
+      x.fillStyle = '#d9a86e'; x.fillRect(px + ((tx * 5 + ty * 3) % 12), py + 1, 3, 1); x.fillRect(px + ((tx * 7 + ty) % 12), py + 9, 3, 1);
+      x.fillStyle = '#93622f'; x.fillRect(px + ((tx + ty) % 2 ? 4 : 11), py + 4, 1, 3); x.fillRect(px + ((tx + ty) % 2 ? 12 : 3), py + 12, 1, 3);
+    },
+    oscura: function (x, px, py, tx, ty) {
+      x.fillStyle = '#7c4a24'; x.fillRect(px, py, 16, 16);
+      x.fillStyle = '#5f3618'; for (var k = 0; k < 16; k += 4) x.fillRect(px, py + k + 3, 16, 1);
+      x.fillStyle = '#8f5a2e'; x.fillRect(px + ((tx * 5 + ty * 3) % 12), py + 1, 4, 1);
+    },
+    marmol: function (x, px, py, tx, ty) {
+      x.fillStyle = '#eef0f3'; x.fillRect(px, py, 16, 16);
+      x.fillStyle = '#d5dae2'; x.fillRect(px + 15, py, 1, 16); x.fillRect(px, py + 15, 16, 1);
+      x.fillStyle = '#c9ced8'; x.fillRect(px + 2 + (tx % 3) * 3, py + 3, 5, 1); x.fillRect(px + 6, py + 4, 1, 4); x.fillRect(px + 7, py + 8, 4, 1);
+    },
+    damero: function (x, px, py, tx, ty) {
+      x.fillStyle = (tx + ty) % 2 ? '#c4b5fd' : '#f5f3ff'; x.fillRect(px, py, 16, 16);
+      x.fillStyle = 'rgba(76,29,149,.12)'; x.fillRect(px, py + 15, 16, 1);
+    },
+    hormigon: function (x, px, py, tx, ty) {
+      x.fillStyle = '#b8b3ad'; x.fillRect(px, py, 16, 16);
+      for (var i = 0; i < 5; i++) { x.fillStyle = i % 2 ? '#a29c95' : '#c9c4be'; x.fillRect(px + Math.floor(hash(tx * 9 + i, ty) * 15), py + Math.floor(hash(ty * 7, tx + i) * 15), 1, 1); }
+      x.fillStyle = '#9b958e'; x.fillRect(px, py + 15, 16, 1); x.fillRect(px + 15, py, 1, 16);
+    },
+    baldosa: function (x, px, py) {
+      x.fillStyle = '#f1f5f9'; x.fillRect(px, py, 16, 16);
+      x.fillStyle = '#cbd5e1'; x.fillRect(px, py + 15, 16, 1); x.fillRect(px + 15, py, 1, 16); x.fillRect(px, py + 7, 16, 1); x.fillRect(px + 7, py, 1, 16);
+    }
+  };
+  H.SUELO = SUELO;
+  H.alfombra = function (x, px, py, col) {
+    x.fillStyle = col || '#b91c1c'; x.fillRect(px, py, 16, 16);
+    x.fillStyle = oscurecer(col || '#b91c1c', 0.75); x.fillRect(px + 3, py + 3, 10, 10);
+    x.fillStyle = '#fbbf24'; x.fillRect(px + 7, py + 7, 2, 2);
+  };
+  H.felpudo = function (x, px, py) {
+    x.fillStyle = '#7c2d12'; x.fillRect(px + 1, py + 2, 14, 12);
+    x.fillStyle = '#9a3412'; for (var k = 0; k < 12; k += 3) x.fillRect(px + 2, py + 3 + k, 12, 1);
+  };
+  H.pared = function (x, px, py, col) {
+    x.fillStyle = oscurecer(col, 0.55); x.fillRect(px, py, 16, 4);
+    x.fillStyle = col; x.fillRect(px, py + 4, 16, 24);
+    x.fillStyle = oscurecer(col, 0.9); x.fillRect(px + 7, py + 4, 1, 22);
+    x.fillStyle = oscurecer(col, 1.08); x.fillRect(px, py + 4, 16, 2);
+    x.fillStyle = '#6b4226'; x.fillRect(px, py + 26, 16, 4); x.fillStyle = '#8b5a2b'; x.fillRect(px, py + 26, 16, 1);
+    x.fillStyle = 'rgba(0,0,0,.25)'; x.fillRect(px, py + 30, 16, 2);
+  };
+
+  // Muebles: o = { m, x, y, w, h } en tiles. f = fotograma de animación (0/1).
+  H.mueble = function (x, o, f) {
+    var px = o.x * 16, py = o.y * 16, W = o.w * 16, Hh = o.h * 16;
+    function r(a, b, c, d, col) { x.fillStyle = col; x.fillRect(px + a, py + b, c, d); }
+    function sombra() { r(2, Hh - 2, W - 2, 3, 'rgba(0,0,0,.22)'); }
+    switch (o.m) {
+      case 'mesa': case 'pc': case 'escritorio':
+        sombra(); r(0, 3, W, 9, K); r(1, 4, W - 2, 6, '#a0673a'); r(1, 4, W - 2, 2, '#c08552'); r(2, 12, 2, 4, K); r(W - 4, 12, 2, 4, K);
+        if (o.m === 'pc') { r(3, -8, 12, 11, K); r(4, -7, 10, 8, f ? '#60a5fa' : '#3b82f6'); r(5, -6, 4, 1, '#dbeafe'); r(5, -4, 6, 1, '#93c5fd'); r(7, 3, 4, 1, K); r(W - 12, 5, 8, 2, '#e5e7eb'); }
+        if (o.m === 'escritorio') { r(4, 1, 8, 4, '#f8fafc'); r(5, 2, 5, 1, '#94a3b8'); r(W - 8, -6, 2, 10, K); r(W - 11, -8, 8, 4, '#facc15'); r(W - 10, -7, 6, 2, '#fde68a'); }
+        break;
+      case 'mostrador':
+        sombra(); r(0, 0, W, 14, K); r(1, 1, W - 2, 12, '#3f2a1e'); r(1, 1, W - 2, 3, '#6b4a33'); r(1, 10, W - 2, 1, '#d4a017');
+        r(W / 2 - 8, 4, 16, 5, '#d4a017'); r(W / 2 - 7, 5, 14, 3, '#fde68a'); break;
+      case 'cama':
+        sombra(); r(0, 0, 16, Hh - 1, K); r(1, 1, 14, 6, '#8b5a2b'); r(2, 6, 12, 6, '#ffffff'); r(3, 7, 10, 3, '#e5e7eb');
+        r(1, 12, 14, Hh - 14, '#2563eb'); r(1, 12, 14, 2, '#60a5fa'); r(3, 18, 10, 1, '#1d4ed8'); break;
+      case 'estanteria':
+        sombra(); r(0, 0, W, Hh - 1, K); r(1, 1, W - 2, Hh - 3, '#7c4a24');
+        for (var sy = 3; sy < Hh - 4; sy += 9) {
+          r(1, sy + 7, W - 2, 1, '#5f3618');
+          for (var bx = 2; bx < W - 3; bx += 3) { var cc = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7', '#f97316'][(bx + sy + o.x) % 6]; r(bx, sy + 1 + ((bx + sy) % 2), 2, 6 - ((bx + sy) % 2), cc); }
+        }
+        break;
+      case 'planta':
+        r(4, 10, 8, 6, K); r(5, 10, 6, 5, '#c2410c'); r(5, 10, 6, 1, '#ea580c');
+        r(3, 1, 10, 10, K); r(4, 2, 8, 8, '#16a34a'); r(5, 3, 3, 3, '#4ade80'); r(9, 5 + (f ? 1 : 0), 2, 2, '#15803d'); break;
+      case 'radio':
+        sombra(); r(1, 6, 14, 10, K); r(2, 7, 12, 8, '#a16207'); r(3, 8, 6, 5, '#1f2937'); r(4, 9, 4, 3, f ? '#374151' : '#4b5563'); r(10, 8, 3, 2, '#fde68a'); r(10, 11, 3, 2, '#fde68a'); r(6, 2, 1, 5, K); break;
+      case 'ventana': case 'ventanal':
+        r(1, 5, W - 2, 20, K); r(2, 6, W - 4, 18, o.m === 'ventanal' ? '#1e3a8a' : '#93c5fd');
+        if (o.m === 'ventanal') { for (var b2 = 3; b2 < W - 4; b2 += 6) { r(b2, 14 + (b2 % 4), 4, 10 - (b2 % 4), '#0f172a'); r(b2 + 1, 16 + (b2 % 4), 1, 1, '#fde047'); } r(4, 8, 2, 2, '#fff'); }
+        else { r(4, 9, 6, 2, '#fff'); r(W - 10, 13, 5, 2, '#fff'); }
+        r(W / 2 - 1, 6, 2, 18, K); r(2, 14, W - 4, 1, K); break;
+      case 'cuadro': case 'foto':
+        r(1, 6, 14, 14, K); r(2, 7, 12, 12, '#d4a017'); r(3, 8, 10, 10, o.m === 'foto' ? '#e7e5e4' : '#38bdf8');
+        if (o.m === 'foto') { r(6, 10, 4, 4, '#f6c9a0'); r(6, 9, 4, 2, '#9ca3af'); r(5, 14, 6, 4, '#334155'); }
+        else { r(3, 14, 10, 4, '#22c55e'); r(8, 10, 3, 3, '#fde047'); } break;
+      case 'tablon':
+        r(1, 5, W - 2, 18, K); r(2, 6, W - 4, 16, '#b45309');
+        [['#fff', 4, 8], ['#fde68a', 12, 9], ['#bbf7d0', 20, 8], ['#fff', 7, 14], ['#fecaca', 16, 15]].forEach(function (n) { if (n[1] < W - 6) { r(n[1], n[2], 6, 5, n[0]); r(n[1] + 2, n[2], 2, 1, '#ef4444'); } });
+        break;
+      case 'sofa':
+        sombra(); r(0, 2, W, 13, K); r(1, 3, W - 2, 5, '#7c3aed'); r(1, 8, W - 2, 6, '#8b5cf6'); r(1, 8, 3, 6, '#6d28d9'); r(W - 4, 8, 3, 6, '#6d28d9'); break;
+      case 'estatua':
+        r(3, 9, 10, 7, K); r(4, 10, 8, 5, '#9ca3af'); r(4, 10, 8, 1, '#d1d5db');
+        r(4, -6, 8, 16, K); r(5, -5, 6, 14, '#d1d5db'); r(6, -2, 4, 3, '#fff'); r(7, -1, 2, 1, f ? '#7c3aed' : '#a78bfa'); break;
+      case 'maquina':
+        sombra(); r(0, -4, W, 19, K); r(1, -3, W - 2, 17, '#64748b'); r(1, -3, W - 2, 3, '#94a3b8');
+        r(3, 2, 8, 6, '#0f172a'); r(4, 3, 6, 4, f ? '#22c55e' : '#16a34a'); r(W - 8, 2, 2, 2, f ? '#ef4444' : '#7f1d1d'); r(W - 5, 2, 2, 2, '#facc15'); r(2, 11, W - 4, 2, '#475569'); break;
+      case 'cajas':
+        sombra(); r(0, 12, W, 4, K); r(1, 13, W - 2, 2, '#a16207');
+        for (var cx = 1; cx < W - 6; cx += 8) { r(cx, 2, 7, 11, K); r(cx + 1, 3, 5, 9, '#d97706'); r(cx + 1, 6, 5, 1, '#92400e'); }
+        break;
+      case 'globo':
+        r(7, 10, 2, 5, K); r(4, 14, 8, 2, K); r(3, 1, 10, 10, K); r(4, 2, 8, 8, '#3b82f6'); r(5, 3, 3, 3, '#22c55e'); r(9, 6, 2, 2, '#22c55e'); break;
+      case 'rotulo':
+        r(1, 6, 14, 14, K); r(2, 7, 12, 12, '#fffbeb');
+        x.font = '10px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'; x.textBaseline = 'top'; x.fillText(o.emoji || '🏢', px + 3, py + 8); break;
+    }
+  };
+
   // Cartel de madera
   H.cartel = function (x, px, py) {
     x.fillStyle = K; x.fillRect(px + 2, py + 2, 12, 9); x.fillRect(px + 7, py + 10, 2, 5);

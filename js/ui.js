@@ -93,7 +93,8 @@ var H = window.H || (window.H = {});
   };
 
   // ---------- Menú con cursor ▶ ----------
-  // ops: ['texto', {t, sub, off, ico}] · op: {pregunta, titulo, cancelable, cols}
+  // ops: ['texto', {t, sub, off, ico, d}] · op: {pregunta, titulo, cancelable, cols, detalle}
+  // Con `detalle`, la caja de diálogo explica la opción marcada (y en táctil: 1er toque marca, 2º elige).
   UI.elegir = function (ops, op) {
     op = op || {};
     return new Promise(function (res) {
@@ -109,9 +110,14 @@ var H = window.H || (window.H = {});
           return '<li data-i="' + i + '" class="' + (i === idx ? 'sel ' : '') + (o.off ? 'off' : '') + '"><span class="cur">▶</span><span class="t">' + (o.ico ? '<em>' + o.ico + '</em>' : '') + UI.esc(o.t) + (o.sub ? '<small>' + UI.esc(o.sub) + '</small>' : '') + '</span></li>';
         }).join('') + '</ul>';
         $$('li', el).forEach(function (li) {
-          li.onclick = function () { var i = +li.dataset.i; if (ops[i].off) { H.audio.sfx_('choque'); return; } idx = i; elegir(); };
+          li.onclick = function () {
+            var i = +li.dataset.i; if (ops[i].off) { H.audio.sfx_('choque'); return; }
+            if (op.detalle && ops[i].d && i !== idx) { idx = i; H.audio.sfx_('mover'); pintar(); return; }
+            idx = i; elegir();
+          };
         });
         var sel = $('li.sel', el); if (sel && sel.scrollIntoView) sel.scrollIntoView({ block: 'nearest' });
+        if (op.detalle && op.pregunta) { var pd = $('p', dlg); if (pd) pd.textContent = (ops[idx] && ops[idx].d) || op.pregunta; }
       }
       function mover(d) {
         var paso = d === 'up' ? -cols : d === 'down' ? cols : d === 'left' ? -1 : 1;
@@ -120,7 +126,8 @@ var H = window.H || (window.H = {});
         for (var k = 0; k < ops.length; k++) { n = (n + paso + ops.length) % ops.length; if (!ops[n].off) break; }
         if (n !== idx) { idx = n; H.audio.sfx_('mover'); pintar(); }
       }
-      function cerrar(v) { UI.pop(h); el.hidden = true; if (op.pregunta) dlg.hidden = true; res(v); }
+      var cerrado = false;
+      function cerrar(v) { if (cerrado) return; cerrado = true; UI.pop(h); el.hidden = true; $$('li', el).forEach(function (li) { li.onclick = null; }); if (op.pregunta) dlg.hidden = true; res(v); }
       function elegir() { H.audio.sfx_('ok'); cerrar(idx); }
       h = UI.push({ dir: mover, a: elegir, b: function () { if (op.cancelable !== false) { H.audio.sfx_('atras'); cerrar(-1); } } });
       pintar();
@@ -193,11 +200,46 @@ var H = window.H || (window.H = {});
       '<div class="nv"><b>Nv.' + s.nivel + '</b><span class="xpbar"><span style="width:' + Math.round(H.progresoNivel(s) * 100) + '%"></span></span></div>' +
       '<div class="mes">' + H.MESES[(9 + s.mes) % 12].slice(0, 3).toUpperCase() + " '" + String(2026 + Math.floor((9 + s.mes) / 12)).slice(2) + '</div>' +
       '<div class="rayos">' + rayos + '</div>' +
-      '<div class="parte" title="Tu parte (25%)">⭐ ' + H.eur(s.tuParte) + '</div>';
+      '<div class="parte' + (s.tuParte < 0 ? ' neg' : '') + '" title="Tu parte (25%)">⭐ ' + H.eur(s.tuParte) + deltaParte(s) + '</div>';
     var m = H.misionActual(s);
     var mi = $('#mision');
     if (m) { mi.hidden = false; mi.innerHTML = '<b>▶ ' + UI.esc(m.t) + '</b><span>' + UI.esc(m.pista) + '</span>'; H.world.objetivo = H.world.posObjetivo(m.ir); }
     else { mi.hidden = true; H.world.objetivo = null; }
+  };
+
+  // ---------- Pistas de Albert: una línea, no bloquean, se van solas ----------
+  var colaPistas = [], pistaViva = false;
+  UI.pista = function (txt) {
+    // En combate no hay sitio arriba: la pista va como una línea de Albert en el diálogo.
+    if (document.querySelector('.p-batalla')) { colaPistas = []; return UI.decir(txt, { nombre: 'ALBERT 📞' }); }
+    colaPistas.push({ t: txt, ts: Date.now() }); if (!pistaViva) siguientePista();
+  };
+  UI.limpiarPistas = function () { colaPistas = []; var el = $('#pista'); if (el) el.hidden = true; pistaViva = false; };
+  function siguientePista() {
+    var it = colaPistas.shift();
+    while (it && Date.now() - it.ts > 12000) it = colaPistas.shift();   // las pistas caducan: nada de consejos fuera de sitio
+    if (!it) { pistaViva = false; return; }
+    var t = it.t;
+    pistaViva = true;
+    var el = $('#pista'); el.innerHTML = '<span class="cara"></span><p>' + UI.esc(t) + '</p>';
+    $('.cara', el).appendChild(UI.sprite(H.LOOK_ALBERT, 'down', 2));
+    el.hidden = false; el.classList.remove('fuera');
+    var cerrar = function () { if (el.hidden) return; el.classList.add('fuera'); setTimeout(function () { el.hidden = true; siguientePista(); }, 220); };
+    el.onclick = cerrar; clearTimeout(el._t); el._t = setTimeout(cerrar, 6500);
+  }
+
+  function deltaParte(s) {
+    var dl = s.tuParte - (s.parteMes || 0);
+    if (Math.abs(dl) < 1000) return '';
+    return ' <i class="' + (dl > 0 ? 'sube' : 'baja') + '">' + (dl > 0 ? '▲' : '▼') + H.eur(Math.abs(dl)).replace(' €', '') + '</i>';
+  }
+  // Animación de "tu parte" al cambiar (palancas, compras): número flotante en el HUD.
+  UI.parteCambio = function (antes) {
+    var s = H.estado; H.actualizarParte(s); var dl = s.tuParte - antes;
+    UI.hud();
+    if (Math.abs(dl) < 500) return dl;
+    var hp = $('#hud .parte'); if (hp) UI.flotar(hp, (dl > 0 ? '+' : '') + H.eur(dl) + ' ⭐', dl > 0 ? 'verde' : 'rojo');
+    return dl;
   };
 
   // ---------- Avisos ----------

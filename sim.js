@@ -4,16 +4,28 @@ const fs = require('fs');
 const HH = window.H;
 function negociar(estilo, d, s) {
   const n = HH.nego(s, d); let r;
-  for (let t = 0; t < 20; t++) {
+  const real = () => HH.MOTIVOS[d.motivo];
+  const creido = () => HH.MOTIVOS[HH.motivoMostrado(d) || d.motivo];
+  for (let t = 0; t < 24; t++) {
     let tipo, arg;
-    if (estilo === 'perfecto') {
+    if (estilo === 'azar') {
+      const ops = ['motivo', 'historia', 'preocupa', 'estructura', 'ancla', 'cerrar', 'bandera', 'repreguntar'];
+      tipo = ops[Math.floor(Math.random() * ops.length)];
+      if (tipo === 'estructura') { const ks = Object.keys(HH.ESTRUCTURAS).filter(k => !n.est.includes(k)); arg = ks[Math.floor(Math.random() * ks.length)]; }
+      if (tipo === 'bandera') { const f = d.banderas.find(b => b.vista && !b.jugada); if (!f) tipo = 'historia'; else arg = f.id; }
+      if (tipo === 'repreguntar' && !d.motivoSabido) tipo = 'motivo';
+    } else {
+      const adapt = estilo === 'adaptativo';
       const um = HH.umbralFirma(d, n);
-      const q = HH.MOTIVOS[d.motivo].quiere.find(e => !n.est.includes(e) && e !== 'rapido');
+      const mot = adapt ? creido() : creido();
+      const q = mot.quiere.find(e => !n.est.includes(e) && e !== 'rapido');
       const flag = d.banderas.find(b => b.vista && !b.jugada && !HH.BANDERAS[b.id].fatal);
-      const est = d.banderas.filter(b => b.vista && !HH.cubierta(b.id, n.est) && !HH.BANDERAS[b.id].arregla.includes('precio')).map(b => HH.BANDERAS[b.id].arregla[0]).find(e => e && !n.est.includes(e) && !HH.MOTIVOS[d.motivo].odia.includes(e));
+      const est = d.banderas.filter(b => b.vista && !HH.cubierta(b.id, n.est) && !HH.BANDERAS[b.id].arregla.includes('precio')).map(b => HH.BANDERAS[b.id].arregla[0]).find(e => e && !n.est.includes(e) && !mot.odia.includes(e));
       if (d.banderas.some(b => b.vista && HH.BANDERAS[b.id].fatal)) tipo = 'irse';
       else if (!d.motivoSabido) tipo = 'motivo';
       else if (n.historia === 0) tipo = 'historia';
+      else if (adapt && n.sospecha && !d.verdadSabida && n.conf >= 45) tipo = 'repreguntar';
+      else if (adapt && n.sospecha && !d.verdadSabida && n.historia < 2) tipo = 'historia';
       else if (q && n.est.length < 2) { tipo = 'estructura'; arg = q; }
       else if (flag && n.conf >= 40) { tipo = 'bandera'; arg = flag.id; }
       else if (est && n.pac > 2) { tipo = 'estructura'; arg = est; }
@@ -21,14 +33,19 @@ function negociar(estilo, d, s) {
       else if (n.conf >= um) tipo = 'cerrar';
       else if (q) { tipo = 'estructura'; arg = q; }
       else tipo = 'historia';
-    } else {
-      const ops = ['motivo', 'historia', 'preocupa', 'estructura', 'ancla', 'cerrar', 'bandera'];
-      tipo = ops[Math.floor(Math.random() * ops.length)];
-      if (tipo === 'estructura') { const ks = Object.keys(HH.ESTRUCTURAS).filter(k => !n.est.includes(k)); arg = ks[Math.floor(Math.random() * ks.length)]; }
-      if (tipo === 'bandera') { const f = d.banderas.find(b => b.vista && !b.jugada); if (!f) tipo = 'historia'; else arg = f.id; }
     }
     r = HH.jugar(s, d, n, tipo, arg);
     if (r.fin) return { fin: r.fin, n };
+    if (r.evento && r.evento.tipo === 'rival') {
+      let op;
+      if (estilo === 'azar') op = ['igualar', 'certeza', 'gente', 'soltar'][Math.floor(Math.random() * 4)];
+      else if (estilo === 'receta') op = 'igualar';
+      else { const m = creido(); op = m.quiere.includes('rapido') ? 'certeza' : m.quiere.includes('legado') ? 'gente' : 'igualar'; }
+      const rr = HH.responderRival(s, d, n, op); if (rr.fin) return { fin: rr.fin, n };
+    } else if (r.evento && r.evento.tipo === 'giro') {
+      const G = HH.GIROS[r.evento.id]; const i = estilo === 'azar' ? Math.floor(Math.random() * G.ops.length) : 0;
+      HH.aplicarGiro(s, d, n, r.evento.id, i);
+    }
   }
   return { fin: 'timeout', n };
 }
@@ -37,7 +54,7 @@ function prueba(estilo, N = 3000) {
   for (let i = 0; i < N; i++) {
     const s = HH.nuevo('X'); s.nivel = 1 + (i % 4);
     const d = HH.genDeal(s, 0);
-    if (estilo === 'perfecto') { d.analizado = true; d.banderas.forEach(b => { if (Math.random() < 0.8) b.vista = true; }); }
+    if (estilo !== 'azar') { d.analizado = true; d.banderas.forEach(b => { if (Math.random() < 0.8) b.vista = true; }); }
     const r = negociar(estilo, d, s);
     if (r.fin === 'compra') {
       compras++; desc += 1 - r.n.precio / d.pide;
@@ -47,8 +64,6 @@ function prueba(estilo, N = 3000) {
   }
   console.log(estilo.padEnd(9), 'cierra', (compras / N * 100).toFixed(0) + '%', '· descuento medio', (desc / Math.max(1, compras) * 100).toFixed(1) + '%', '· estrellas 1/2/3:', est.slice(1).map(x => (x / Math.max(1, compras) * 100).toFixed(0) + '%').join(' / '));
 }
-prueba('perfecto'); prueba('azar');
-
 // Partida de 24 meses jugando razonable
 function partida() {
   const s = HH.nuevo('X');
@@ -56,7 +71,7 @@ function partida() {
     for (const d of s.deals.slice()) {
       if (s.energia < 2 || s.empresas.length >= 4) break;
       s.energia -= 2; d.analizado = true; d.banderas.forEach(b => { if (Math.random() < 0.75) b.vista = true; });
-      const r = negociar('perfecto', d, s);
+      const r = negociar('adaptativo', d, s);
       if (r.fin === 'compra') { const op = HH.financiacion(s, d, r.n).ops.filter(o => o.ok).pop(); if (op) HH.comprar(s, d, r.n, op); }
       else s.deals = s.deals.filter(x => x.id !== d.id);
     }
@@ -76,6 +91,10 @@ function partida() {
   HH.actualizarParte(s);
   return s;
 }
+module.exports = { HH, negociar, partida };
+if (require.main === module) {
+prueba('adaptativo'); prueba('receta'); prueba('azar');
+
 const res = []; for (let i = 0; i < 300; i++) { const s = partida(); res.push([s.tuParte, s.realizado * 0.25, s.empresas.length + s.stats.ventas, s.albert]); }
 res.sort((a, b) => a[0] - b[0]);
 const q = k => res[Math.floor(res.length * k)];
@@ -84,3 +103,5 @@ console.log('24 meses · tu parte (25%) p25/mediana/p75:', [0.25, 0.5, 0.75].map
 const s = partida();
 console.log('diag: capital', HH.eur(s.capital), 'caja', HH.eur(s.caja), 'nav', HH.eur(HH.nav(s)), 'realizado', HH.eur(s.realizado), 'ventas', s.stats.ventas);
 s.empresas.forEach(c => console.log('  ', c.sec, 'ebitda', HH.eur(c.ebitda), '(compra', HH.eur(c.ebitda0) + ')', 'mult', HH.multSalida(s, c).toFixed(2), 'valor', HH.eur(HH.valorEmpresa(s, c)), 'precio', HH.eur(c.precio), 'deuda', HH.eur(HH.deudaEmpresa(c)), 'riesgos', c.riesgos.length));
+
+}
